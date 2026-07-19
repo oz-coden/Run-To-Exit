@@ -1,5 +1,12 @@
 {
   "dependencies": {
+    "com.github.oz-coden.safestringgenerator": {
+      "version": "https://github.com/oz-coden/SafeStringGenerator-for-Unity.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "0ec213c1dcf8d4e0decdad9c9cd99f0106528d48"
+    },
     "com.unity.2d.animation": {
       "version": "13.0.4",
       "depth": 0,
