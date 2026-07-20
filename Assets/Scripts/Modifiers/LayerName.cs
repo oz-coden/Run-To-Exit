@@ -6,4 +6,5 @@ public static class LayerName
     public const int IgnoreRaycast = 2;
     public const int Water = 4;
     public const int UI = 5;
+    public const int Interactable = 8;
 }
