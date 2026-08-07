@@ -8,6 +8,7 @@ namespace RunToExit.Core
         public static CommandManager Instance { get; private set; }
 
         public NPCController SelectedNPC { get; private set; }
+        private bool isTargetingItemUse = false;
 
         private void Awake()
         {
@@ -33,6 +34,15 @@ namespace RunToExit.Core
             Collider2D hit = Physics2D.OverlapPoint(worldPos);
             if (hit != null)
             {
+                // アイテムアイコンをクリックしたか判定
+                HeldItemIcon icon = hit.GetComponent<HeldItemIcon>();
+                if (icon != null && icon.Owner is NPCController ownerNPC && ownerNPC == SelectedNPC)
+                {
+                    isTargetingItemUse = true;
+                    Debug.Log("Targeting item use... Click destination.");
+                    return;
+                }
+
                 NPCController npc = hit.GetComponent<NPCController>();
                 if (npc != null && npc.IsRescued)
                 {
@@ -41,15 +51,27 @@ namespace RunToExit.Core
                 }
             }
 
-            // 2. マップをクリックした場合、選択中のNPCに移動を指示
+            // 2. マップをクリックした場合
             if (SelectedNPC != null)
             {
-                SelectedNPC.MoveTo(gridPos);
+                if (isTargetingItemUse)
+                {
+                    // 指定場所へ移動してアイテムを使う
+                    SelectedNPC.MoveAndUseItem(gridPos);
+                    isTargetingItemUse = false; // 一度指示したら解除
+                }
+                else
+                {
+                    // 普通の移動指示
+                    SelectedNPC.MoveTo(gridPos);
+                }
             }
         }
 
         public void SelectNPC(NPCController npc)
         {
+            isTargetingItemUse = false;
+
             if (SelectedNPC != null)
             {
                 // 以前の選択解除（色を戻すなど）

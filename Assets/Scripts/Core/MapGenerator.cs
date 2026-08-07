@@ -11,7 +11,12 @@ namespace RunToExit.Core
         public GameObject wallPrefab;
         public GameObject playerPrefab;
         public GameObject boxPrefab;
-        // 今後NPCやドアなどのPrefabを追加していきます
+        public GameObject npcPrefab;
+        public GameObject firePrefab;
+        public GameObject extinguisherPrefab;
+        public GameObject switchPrefab;
+        public GameObject doorPrefab;
+        public GameObject exitPrefab;
 
         [Header("Settings")]
         public Vector2 startPosition = Vector2.zero; // マップの左下などの基準点
@@ -62,10 +67,29 @@ namespace RunToExit.Core
                     break;
                 case 'P': // プレイヤー
                     prefabToSpawn = playerPrefab;
-                    position.y += 0.5f; // プレイヤーは2マスサイズで中心座標がズレるため+0.5調整
+                    position.y += 0.5f; 
                     break;
                 case 'B': // 木箱
                     prefabToSpawn = boxPrefab;
+                    break;
+                case 'N': // NPC
+                    prefabToSpawn = npcPrefab;
+                    position.y += 0.5f; 
+                    break;
+                case 'F': // 炎
+                    prefabToSpawn = firePrefab;
+                    break;
+                case 'E': // 消火器
+                    prefabToSpawn = extinguisherPrefab;
+                    break;
+                case 'S': // スイッチ
+                    prefabToSpawn = switchPrefab;
+                    break;
+                case 'D': // ドア
+                    prefabToSpawn = doorPrefab;
+                    break;
+                case 'X': // 出口
+                    prefabToSpawn = exitPrefab;
                     break;
                 case ' ': // 空白
                 default:

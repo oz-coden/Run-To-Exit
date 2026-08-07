@@ -70,8 +70,12 @@ namespace RunToExit.Core
                 {
                     // 横移動（落下含む）
                     Vector2Int horizontalTarget = new Vector2Int(nextPos.x, GridPosition.y);
-                    if (CanMoveTo(horizontalTarget, out MovableBox box, out NPCController npc))
+                    if (CanMoveTo(horizontalTarget, out MovableBox box, out NPCController npc, out InteractableBase interactable))
                     {
+                        if (interactable != null && !interactable.IsObstacle(this))
+                        {
+                            interactable.OnInteract(this);
+                        }
                         // 経路探索時点では箱がないか避けている前提
                         yield return StartCoroutine(MoveRoutine(horizontalTarget, box));
                     }
@@ -85,6 +89,53 @@ namespace RunToExit.Core
                 while (State != CharacterState.Idle)
                 {
                     yield return null;
+                }
+            }
+        }
+
+        public void MoveAndUseItem(Vector2Int targetPos)
+        {
+            if (!IsRescued || HeldItem == null) return;
+            
+            // アイテム使用は「対象の隣」から行うため、対象そのものの座標には行けない場合がある（炎など）
+            // そのため、対象の隣接マスまでの経路を検索するなどの工夫が必要ですが、
+            // 今回は簡略化のため、目標座標をそのままA*に渡し、A*側で到達不可なら近くまで行くか、
+            // MoveAndUseItemコルーチン内で、目的地に近づいた時点でアイテムを使うようにします。
+            
+            if (followPathCoroutine != null) StopCoroutine(followPathCoroutine);
+            followPathCoroutine = StartCoroutine(MoveAndUseRoutine(targetPos));
+        }
+
+        private System.Collections.IEnumerator MoveAndUseRoutine(Vector2Int targetInteractPos)
+        {
+            // 目標の隣（左右）のマスを探索の目的地にする
+            // 本当はPathfinder側で「最寄りの隣接マス」を計算すべきですが、ここでは簡易的に対象とのX距離が1になるまで移動します。
+            
+            // とりあえず対象の座標をセット（障害物だとPathfinderが失敗する可能性があるため、実際のゲームでは工夫が必要）
+            // 炎などは障害物なので、そのままではPathが見つからない。
+            // そこで、対象の1歩手前を目的地として算出する。
+            int dirX = targetInteractPos.x > GridPosition.x ? -1 : 1;
+            Vector2Int standPos = new Vector2Int(targetInteractPos.x + dirX, targetInteractPos.y);
+            
+            System.Collections.Generic.List<Vector2Int> path = Pathfinder.FindPath(this, GridPosition, standPos);
+            if (path != null && path.Count > 0)
+            {
+                yield return StartCoroutine(FollowPathRoutine(path));
+            }
+            
+            // 移動完了後、ターゲット方向を向いてアイテムを使う
+            if (State == CharacterState.Idle)
+            {
+                FacingDirection = targetInteractPos.x > GridPosition.x ? 1 : -1;
+                Collider2D[] hits = Physics2D.OverlapPointAll(new Vector2(targetInteractPos.x, targetInteractPos.y));
+                foreach (var hit in hits)
+                {
+                    var interactable = hit.GetComponent<InteractableBase>();
+                    if (interactable != null)
+                    {
+                        UseItemOn(interactable);
+                        break;
+                    }
                 }
             }
         }

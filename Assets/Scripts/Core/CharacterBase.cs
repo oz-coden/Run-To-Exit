@@ -22,6 +22,7 @@ namespace RunToExit.Core
         }
 
         public CharacterState State { get; protected set; } = CharacterState.Idle;
+        public int FacingDirection { get; protected set; } = 1;
 
         protected float visualYOffset = 0f;
 
@@ -36,11 +37,15 @@ namespace RunToExit.Core
             Mathf.RoundToInt(transform.position.y - visualYOffset)
         );
 
+        public ItemType? HeldItem { get; protected set; }
+        private GameObject heldItemVisual;
+
         // キャラクターは2マスサイズ（足元と頭上）
-        public virtual bool CanMoveTo(Vector2Int targetPos, out MovableBox pushableBox, out NPCController npcHit)
+        public virtual bool CanMoveTo(Vector2Int targetPos, out MovableBox pushableBox, out NPCController npcHit, out InteractableBase interactable)
         {
             pushableBox = null;
             npcHit = null;
+            interactable = null;
 
             Vector2Int footPos = targetPos;
             Vector2Int headPos = targetPos + Vector2Int.up;
@@ -76,10 +81,32 @@ namespace RunToExit.Core
             }
 
             // 他の障害物（NPCなど）が居る場合も進めない
-            if (hitFoot != null) npcHit = hitFoot.GetComponent<NPCController>();
-            if (hitHead != null && npcHit == null) npcHit = hitHead.GetComponent<NPCController>();
+            if (hitFoot != null)
+            {
+                npcHit = hitFoot.GetComponent<NPCController>();
+                interactable = hitFoot.GetComponent<InteractableBase>();
+                if (interactable != null && interactable.IsObstacle(this)) return false;
+            }
+            
+            if (hitHead != null)
+            {
+                if (npcHit == null) npcHit = hitHead.GetComponent<NPCController>();
+                if (interactable == null) interactable = hitHead.GetComponent<InteractableBase>();
+                if (interactable != null && interactable.IsObstacle(this)) return false;
+            }
 
-            if (hitFoot != null || hitHead != null) return false;
+            if (hitFoot != null || hitHead != null)
+            {
+                // インタラクタブル（通過可能なアイテム等）であれば移動をブロックしない
+                if (interactable != null && !interactable.IsObstacle(this))
+                {
+                    // OK
+                }
+                else
+                {
+                    return false;
+                }
+            }
 
             return true;
         }
@@ -93,6 +120,8 @@ namespace RunToExit.Core
                 Vector2Int boxTarget = targetPos + (targetPos - GridPosition);
                 boxToPush.PushTo(boxTarget);
             }
+
+            if (dirX != 0) FacingDirection = dirX;
 
             Vector3 endPos = new Vector3(targetPos.x, targetPos.y + visualYOffset, 0);
             while (Vector3.Distance(transform.position, endPos) > 0.01f)
@@ -234,6 +263,7 @@ namespace RunToExit.Core
         protected IEnumerator LongJumpRoutine(Vector2Int landPos)
         {
             State = CharacterState.LongJumping;
+            if (landPos.x != GridPosition.x) FacingDirection = landPos.x > GridPosition.x ? 1 : -1;
 
             Vector3 startPos = transform.position;
             Vector3 endPos = new Vector3(landPos.x, landPos.y + visualYOffset, 0);
@@ -316,6 +346,50 @@ namespace RunToExit.Core
             if (hit.CompareTag(TagName.Wall)) return true;
             if (hit.GetComponent<MovableBox>() != null) return true;
             return false;
+        }
+
+        public void PickUpItem(ItemBase item)
+        {
+            HeldItem = item.itemType;
+            Debug.Log($"{gameObject.name} picked up {HeldItem}");
+
+            // 見た目の設定（頭上に表示）
+            if (heldItemVisual == null)
+            {
+                heldItemVisual = new GameObject("HeldItemVisual");
+                heldItemVisual.transform.SetParent(transform);
+                heldItemVisual.transform.localPosition = new Vector3(0, 1.5f, 0); // 頭上
+                var sr = heldItemVisual.AddComponent<SpriteRenderer>();
+                sr.sprite = item.GetComponent<SpriteRenderer>()?.sprite; // 同じスプライトをコピー
+                sr.sortingOrder = 10;
+                
+                var col = heldItemVisual.AddComponent<BoxCollider2D>();
+                col.isTrigger = true;
+                var icon = heldItemVisual.AddComponent<HeldItemIcon>();
+                icon.Owner = this;
+            }
+            else
+            {
+                heldItemVisual.SetActive(true);
+                heldItemVisual.GetComponent<SpriteRenderer>().sprite = item.GetComponent<SpriteRenderer>()?.sprite;
+            }
+
+            // 元のアイテムオブジェクトは消す
+            Destroy(item.gameObject);
+        }
+
+        public void UseItemOn(InteractableBase target)
+        {
+            if (HeldItem == null) return;
+
+            if (HeldItem == ItemType.Extinguisher && target is FireHazard fire)
+            {
+                fire.Extinguish();
+                // 使い捨てとする場合
+                HeldItem = null;
+                if (heldItemVisual != null) heldItemVisual.SetActive(false);
+            }
+            // 他のアイテム使用ロジックもここに追加
         }
     }
 }
