@@ -42,8 +42,8 @@ namespace RunToExit.Core
             if (hitFoot == null && hitHead == null) return true; // 空いている
 
             // 壁チェック
-            if ((hitFoot != null && hitFoot.CompareTag("Wall")) || 
-                (hitHead != null && hitHead.CompareTag("Wall")))
+            if ((hitFoot != null && hitFoot.CompareTag(TagName.Wall)) || 
+                (hitHead != null && hitHead.CompareTag(TagName.Wall)))
             {
                 return false;
             }
@@ -145,7 +145,7 @@ namespace RunToExit.Core
 
             // 移動先の足元（本来のtargetPos）には足場（壁など）があるべき
             Collider2D footHit = GridManager.Instance.GetObjectAt(targetPos);
-            if (footHit == null || !footHit.CompareTag("Wall")) return false; // ※木箱に乗れる仕様なら条件変更が必要
+            if (footHit == null || !footHit.CompareTag(TagName.Wall)) return false; // ※木箱に乗れる仕様なら条件変更が必要
 
             StartCoroutine(StepUpRoutine(targetStep));
             return true;
@@ -190,7 +190,7 @@ namespace RunToExit.Core
                 Collider2D belowHit = GridManager.Instance.GetObjectAt(belowLandPos);
 
                 // 着地点自体が空いていて、その下が壁(着地可能)なら
-                if (landHit == null && headHit == null && belowHit != null && belowHit.CompareTag("Wall"))
+                if (landHit == null && headHit == null && belowHit != null && belowHit.CompareTag(TagName.Wall))
                 {
                     // 間の空間が空いているかチェック
                     bool pathClear = true;
@@ -255,7 +255,7 @@ namespace RunToExit.Core
                 Collider2D headHit = GridManager.Instance.GetObjectAt(standHeadPos);
 
                 // 壁が存在し、その上が空いていて、頭上も空いているか
-                if (wallHit != null && wallHit.CompareTag("Wall") && standHit == null && headHit == null)
+                if (wallHit != null && wallHit.CompareTag(TagName.Wall) && standHit == null && headHit == null)
                 {
                     StartCoroutine(LedgeGrabRoutine(h, standPos));
                     return true;

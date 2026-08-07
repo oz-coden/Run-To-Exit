@@ -28,7 +28,7 @@ namespace RunToExit.Core
         public bool IsWallAt(Vector2Int gridPos)
         {
             Collider2D col = GetObjectAt(gridPos);
-            return col != null && col.CompareTag("Wall");
+            return col != null && col.CompareTag(TagName.Wall);
         }
 
         public T GetComponentAt<T>(Vector2Int gridPos) where T : Component

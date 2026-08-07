@@ -62,6 +62,7 @@ namespace RunToExit.Core
                     break;
                 case 'P': // プレイヤー
                     prefabToSpawn = playerPrefab;
+                    position.y += 0.5f; // プレイヤーは2マスサイズで中心座標がズレるため+0.5調整
                     break;
                 case 'B': // 木箱
                     prefabToSpawn = boxPrefab;
