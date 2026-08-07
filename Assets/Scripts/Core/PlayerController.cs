@@ -42,7 +42,7 @@ namespace RunToExit.Core
 
         private void Update()
         {
-            if (isMoving || isFalling) return;
+            if (State != CharacterState.Idle) return;
 
             Vector2 inputVector = moveAction.ReadValue<Vector2>();
 
@@ -55,6 +55,11 @@ namespace RunToExit.Core
                 if (CanMoveTo(targetPos, out MovableBox box))
                 {
                     StartCoroutine(MoveRoutine(targetPos, box));
+                }
+                else if (box == null) // 箱で塞がれているわけではない（壁である）場合
+                {
+                    TryStepUp(targetPos);
+                    // ここに幅跳びやよじ登りの処理を今後追加します
                 }
             }
             // 上下はフェーズ2での「はしご昇降」「ジャンプ」等のため一旦保留
