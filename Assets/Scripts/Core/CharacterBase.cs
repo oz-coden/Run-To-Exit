@@ -23,7 +23,18 @@ namespace RunToExit.Core
 
         public CharacterState State { get; protected set; } = CharacterState.Idle;
 
-        public Vector2Int GridPosition => new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.y));
+        protected float visualYOffset = 0f;
+
+        protected virtual void Start()
+        {
+            // Y座標の初期オフセットを記録（MapGenerator等で+0.5された場合への対応）
+            visualYOffset = transform.position.y - Mathf.Floor(transform.position.y);
+        }
+
+        public Vector2Int GridPosition => new Vector2Int(
+            Mathf.RoundToInt(transform.position.x), 
+            Mathf.RoundToInt(transform.position.y - visualYOffset)
+        );
 
         // キャラクターは2マスサイズ（足元と頭上）
         public virtual bool CanMoveTo(Vector2Int targetPos, out MovableBox pushableBox, out NPCController npcHit)
@@ -83,7 +94,7 @@ namespace RunToExit.Core
                 boxToPush.PushTo(boxTarget);
             }
 
-            Vector3 endPos = new Vector3(targetPos.x, targetPos.y, 0);
+            Vector3 endPos = new Vector3(targetPos.x, targetPos.y + visualYOffset, 0);
             while (Vector3.Distance(transform.position, endPos) > 0.01f)
             {
                 transform.position = Vector3.MoveTowards(transform.position, endPos, MoveSpeed * Time.deltaTime);
@@ -170,7 +181,7 @@ namespace RunToExit.Core
             transform.position = upPos;
 
             // 次に横に1マス進む
-            Vector3 forwardPos = new Vector3(targetStep.x, targetStep.y, 0);
+            Vector3 forwardPos = new Vector3(targetStep.x, targetStep.y + visualYOffset, 0);
             while (Vector3.Distance(transform.position, forwardPos) > 0.01f)
             {
                 transform.position = Vector3.MoveTowards(transform.position, forwardPos, MoveSpeed * 1.5f * Time.deltaTime);
@@ -225,7 +236,7 @@ namespace RunToExit.Core
             State = CharacterState.LongJumping;
 
             Vector3 startPos = transform.position;
-            Vector3 endPos = new Vector3(landPos.x, landPos.y, 0);
+            Vector3 endPos = new Vector3(landPos.x, landPos.y + visualYOffset, 0);
             float duration = Vector3.Distance(startPos, endPos) / (MoveSpeed * 1.5f);
             float elapsed = 0f;
 
@@ -275,7 +286,7 @@ namespace RunToExit.Core
             
             // ぶら下がり位置（壁の側面に張り付くため真上に移動）
             Vector2Int hangGridPos = GridPosition + new Vector2Int(0, height - 1);
-            Vector3 hangVisualPos = new Vector3(hangGridPos.x, hangGridPos.y, 0);
+            Vector3 hangVisualPos = new Vector3(hangGridPos.x, hangGridPos.y + visualYOffset, 0);
 
             while (Vector3.Distance(transform.position, hangVisualPos) > 0.01f)
             {
@@ -287,7 +298,7 @@ namespace RunToExit.Core
             // よじ登り開始
             State = CharacterState.Climbing;
 
-            Vector3 standVisualPos = new Vector3(standPos.x, standPos.y, 0);
+            Vector3 standVisualPos = new Vector3(standPos.x, standPos.y + visualYOffset, 0);
             while (Vector3.Distance(transform.position, standVisualPos) > 0.01f)
             {
                 transform.position = Vector3.MoveTowards(transform.position, standVisualPos, MoveSpeed * 1.5f * Time.deltaTime);

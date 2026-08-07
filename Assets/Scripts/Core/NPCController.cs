@@ -6,8 +6,10 @@ namespace RunToExit.Core
     {
         public bool IsRescued { get; private set; } = false;
 
-        private void Start()
+        protected override void Start()
         {
+            base.Start();
+
             Power = 1;
             MoveSpeed = 4.5f; // プレイヤーより若干遅い
             ClimbLimit = 3; 

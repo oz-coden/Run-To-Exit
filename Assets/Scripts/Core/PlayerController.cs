@@ -38,8 +38,10 @@ namespace RunToExit.Core
             sprintAction.Disable();
         }
 
-        private void Start()
+        protected override void Start()
         {
+            base.Start();
+
             // フェーズ1のテスト用ステータス設定（青年ベース）
             Power = 1;
             MoveSpeed = 5f;
