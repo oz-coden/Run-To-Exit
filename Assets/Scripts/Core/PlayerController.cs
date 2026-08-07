@@ -6,6 +6,7 @@ namespace RunToExit.Core
     public class PlayerController : CharacterBase
     {
         private InputAction moveAction;
+        private InputAction sprintAction;
 
         private void Awake()
         {
@@ -20,16 +21,21 @@ namespace RunToExit.Core
                 .With("Left", "<Keyboard>/leftArrow")
                 .With("Right", "<Keyboard>/d")
                 .With("Right", "<Keyboard>/rightArrow");
+
+            sprintAction = new InputAction("Sprint", binding: "<Keyboard>/leftShift");
+            sprintAction.AddBinding("<Gamepad>/buttonEast"); // Bボタンなど
         }
 
         private void OnEnable()
         {
             moveAction.Enable();
+            sprintAction.Enable();
         }
 
         private void OnDisable()
         {
             moveAction.Disable();
+            sprintAction.Disable();
         }
 
         private void Start()
@@ -45,6 +51,7 @@ namespace RunToExit.Core
             if (State != CharacterState.Idle) return;
 
             Vector2 inputVector = moveAction.ReadValue<Vector2>();
+            bool isSprinting = sprintAction.IsPressed();
 
             // 左右の移動入力を優先
             if (Mathf.Abs(inputVector.x) > 0.1f)
@@ -54,16 +61,31 @@ namespace RunToExit.Core
                 
                 if (CanMoveTo(targetPos, out MovableBox box))
                 {
+                    // 移動先に床がない（穴）の場合、スプリント中なら幅跳び判定
+                    if (isSprinting && IsGap(targetPos))
+                    {
+                        if (TryLongJump(dirX)) return;
+                    }
+
                     StartCoroutine(MoveRoutine(targetPos, box));
                 }
                 else if (box == null) // 箱で塞がれているわけではない（壁である）場合
                 {
-                    TryStepUp(targetPos);
-                    // ここに幅跳びやよじ登りの処理を今後追加します
+                    if (!TryStepUp(targetPos))
+                    {
+                        TryLedgeGrab(dirX);
+                    }
                 }
             }
             // 上下はフェーズ2での「はしご昇降」「ジャンプ」等のため一旦保留
             // else if (Mathf.Abs(inputVector.y) > 0.1f) { ... }
+        }
+
+        private bool IsGap(Vector2Int targetPos)
+        {
+            Vector2Int below = targetPos + Vector2Int.down;
+            Collider2D hit = GridManager.Instance.GetObjectAt(below);
+            return hit == null;
         }
     }
 }

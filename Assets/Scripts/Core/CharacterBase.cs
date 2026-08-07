@@ -176,5 +176,122 @@ namespace RunToExit.Core
             State = CharacterState.Idle;
             CheckFall();
         }
+
+        public virtual bool TryLongJump(int dirX)
+        {
+            // 最大3マスの幅跳びを試みる
+            for (int dist = 2; dist <= 4; dist++) // dist=1は隣のマス(穴)、dist=2〜4(幅1〜3の穴の先)
+            {
+                Vector2Int landPos = GridPosition + new Vector2Int(dirX * dist, 0);
+                Vector2Int belowLandPos = landPos + Vector2Int.down;
+
+                Collider2D landHit = GridManager.Instance.GetObjectAt(landPos);
+                Collider2D headHit = GridManager.Instance.GetObjectAt(landPos + Vector2Int.up);
+                Collider2D belowHit = GridManager.Instance.GetObjectAt(belowLandPos);
+
+                // 着地点自体が空いていて、その下が壁(着地可能)なら
+                if (landHit == null && headHit == null && belowHit != null && belowHit.CompareTag("Wall"))
+                {
+                    // 間の空間が空いているかチェック
+                    bool pathClear = true;
+                    for (int i = 1; i < dist; i++)
+                    {
+                        Vector2Int pathPos = GridPosition + new Vector2Int(dirX * i, 0);
+                        Vector2Int pathHeadPos = pathPos + Vector2Int.up;
+                        if (GridManager.Instance.GetObjectAt(pathPos) != null || GridManager.Instance.GetObjectAt(pathHeadPos) != null)
+                        {
+                            pathClear = false;
+                            break;
+                        }
+                    }
+
+                    if (pathClear)
+                    {
+                        StartCoroutine(LongJumpRoutine(landPos));
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        protected IEnumerator LongJumpRoutine(Vector2Int landPos)
+        {
+            State = CharacterState.LongJumping;
+
+            Vector3 startPos = transform.position;
+            Vector3 endPos = new Vector3(landPos.x, landPos.y, 0);
+            float duration = Vector3.Distance(startPos, endPos) / (MoveSpeed * 1.5f);
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                
+                Vector3 currentPos = Vector3.Lerp(startPos, endPos, t);
+                currentPos.y += Mathf.Sin(t * Mathf.PI) * 0.5f; // 放物線を描く
+
+                transform.position = currentPos;
+                yield return null;
+            }
+
+            transform.position = endPos;
+            State = CharacterState.Idle;
+            CheckFall();
+        }
+
+        public virtual bool TryLedgeGrab(int dirX)
+        {
+            // よじ登り（高さ2〜ClimbLimitマス）
+            for (int h = 2; h <= ClimbLimit; h++)
+            {
+                Vector2Int grabWallPos = GridPosition + new Vector2Int(dirX, h - 1); // 壁の最上段
+                Vector2Int standPos = GridPosition + new Vector2Int(dirX, h); // 登った後の立ち位置
+                Vector2Int standHeadPos = standPos + Vector2Int.up;
+
+                Collider2D wallHit = GridManager.Instance.GetObjectAt(grabWallPos);
+                Collider2D standHit = GridManager.Instance.GetObjectAt(standPos);
+                Collider2D headHit = GridManager.Instance.GetObjectAt(standHeadPos);
+
+                // 壁が存在し、その上が空いていて、頭上も空いているか
+                if (wallHit != null && wallHit.CompareTag("Wall") && standHit == null && headHit == null)
+                {
+                    StartCoroutine(LedgeGrabRoutine(h, standPos));
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        protected IEnumerator LedgeGrabRoutine(int height, Vector2Int standPos)
+        {
+            State = CharacterState.Hanging;
+            
+            // ぶら下がり位置（壁の側面に張り付くため真上に移動）
+            Vector2Int hangGridPos = GridPosition + new Vector2Int(0, height - 1);
+            Vector3 hangVisualPos = new Vector3(hangGridPos.x, hangGridPos.y, 0);
+
+            while (Vector3.Distance(transform.position, hangVisualPos) > 0.01f)
+            {
+                transform.position = Vector3.MoveTowards(transform.position, hangVisualPos, MoveSpeed * 1.5f * Time.deltaTime);
+                yield return null;
+            }
+            transform.position = hangVisualPos;
+
+            // よじ登り開始
+            State = CharacterState.Climbing;
+
+            Vector3 standVisualPos = new Vector3(standPos.x, standPos.y, 0);
+            while (Vector3.Distance(transform.position, standVisualPos) > 0.01f)
+            {
+                transform.position = Vector3.MoveTowards(transform.position, standVisualPos, MoveSpeed * 1.5f * Time.deltaTime);
+                yield return null;
+            }
+            transform.position = standVisualPos;
+
+            State = CharacterState.Idle;
+            CheckFall();
+        }
     }
 }
