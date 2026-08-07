@@ -26,9 +26,11 @@ namespace RunToExit.Core
         public Vector2Int GridPosition => new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.y));
 
         // キャラクターは2マスサイズ（足元と頭上）
-        public virtual bool CanMoveTo(Vector2Int targetPos, out MovableBox pushableBox)
+        public virtual bool CanMoveTo(Vector2Int targetPos, out MovableBox pushableBox, out NPCController npcHit)
         {
             pushableBox = null;
+            npcHit = null;
+
             Vector2Int footPos = targetPos;
             Vector2Int headPos = targetPos + Vector2Int.up;
 
@@ -63,6 +65,9 @@ namespace RunToExit.Core
             }
 
             // 他の障害物（NPCなど）が居る場合も進めない
+            if (hitFoot != null) npcHit = hitFoot.GetComponent<NPCController>();
+            if (hitHead != null && npcHit == null) npcHit = hitHead.GetComponent<NPCController>();
+
             if (hitFoot != null || hitHead != null) return false;
 
             return true;
@@ -145,7 +150,7 @@ namespace RunToExit.Core
 
             // 移動先の足元（本来のtargetPos）には足場（壁など）があるべき
             Collider2D footHit = GridManager.Instance.GetObjectAt(targetPos);
-            if (footHit == null || !footHit.CompareTag(TagName.Wall)) return false; // ※木箱に乗れる仕様なら条件変更が必要
+            if (!IsSolidPlatform(footHit)) return false;
 
             StartCoroutine(StepUpRoutine(targetStep));
             return true;
@@ -189,8 +194,8 @@ namespace RunToExit.Core
                 Collider2D headHit = GridManager.Instance.GetObjectAt(landPos + Vector2Int.up);
                 Collider2D belowHit = GridManager.Instance.GetObjectAt(belowLandPos);
 
-                // 着地点自体が空いていて、その下が壁(着地可能)なら
-                if (landHit == null && headHit == null && belowHit != null && belowHit.CompareTag(TagName.Wall))
+                // 着地点自体が空いていて、その下が足場(着地可能)なら
+                if (landHit == null && headHit == null && IsSolidPlatform(belowHit))
                 {
                     // 間の空間が空いているかチェック
                     bool pathClear = true;
@@ -255,7 +260,7 @@ namespace RunToExit.Core
                 Collider2D headHit = GridManager.Instance.GetObjectAt(standHeadPos);
 
                 // 壁が存在し、その上が空いていて、頭上も空いているか
-                if (wallHit != null && wallHit.CompareTag(TagName.Wall) && standHit == null && headHit == null)
+                if (IsSolidPlatform(wallHit) && standHit == null && headHit == null)
                 {
                     StartCoroutine(LedgeGrabRoutine(h, standPos));
                     return true;
@@ -292,6 +297,14 @@ namespace RunToExit.Core
 
             State = CharacterState.Idle;
             CheckFall();
+        }
+
+        protected bool IsSolidPlatform(Collider2D hit)
+        {
+            if (hit == null) return false;
+            if (hit.CompareTag(TagName.Wall)) return true;
+            if (hit.GetComponent<MovableBox>() != null) return true;
+            return false;
         }
     }
 }

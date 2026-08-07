@@ -59,7 +59,7 @@ namespace RunToExit.Core
                 int dirX = inputVector.x > 0 ? 1 : -1;
                 Vector2Int targetPos = GridPosition + new Vector2Int(dirX, 0);
                 
-                if (CanMoveTo(targetPos, out MovableBox box))
+                if (CanMoveTo(targetPos, out MovableBox box, out NPCController npcHit))
                 {
                     // 移動先に床がない（穴）の場合、スプリント中なら幅跳び判定
                     if (isSprinting && IsGap(targetPos))
@@ -69,7 +69,11 @@ namespace RunToExit.Core
 
                     StartCoroutine(MoveRoutine(targetPos, box));
                 }
-                else if (box == null) // 箱で塞がれているわけではない（壁である）場合
+                else if (npcHit != null && !npcHit.IsRescued)
+                {
+                    npcHit.Rescue();
+                }
+                else if (box == null && npcHit == null) // 箱でもNPCでも塞がれているわけではない（壁である）場合
                 {
                     if (!TryStepUp(targetPos))
                     {
