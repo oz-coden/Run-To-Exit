@@ -1,101 +1,105 @@
+using System.Collections;
 using UnityEngine;
-using UnityEngine.Tilemaps;
+using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("Move Settings")]
     public float moveSpeed = 5f;
-
-    [Header("Reference Environments")]
-    public Grid grid;
-    public Tilemap interactableTilemap;
-
-    [Header("Rule Setting")]
-    public LayerMask interactableLayer;
-
-    private Vector2 facingDirection = Vector2.right;
-
-    private Vector3 debugTargetCenter;
-
-    void Start()
-    {
-
-    }
+    private bool isMoving = false;
 
     void Update()
     {
-        HandleMovement();
+        if (isMoving) return;
+        float inputX = 0f;
+        float inputY = 0f;
 
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Keyboard.current != null)
         {
-            TryInteract();
+            if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed) inputX = 1f;
+            else if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed) inputX = -1f;
+            
+            if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed) inputY = 1f;
+            else if (Keyboard.current.downArrowKey.isPressed || Keyboard.current.sKey.isPressed) inputY = -1f;
+        }
+
+        if (inputX != 0)
+        {
+            StartCoroutine(MoveToGrid(new Vector3(inputX, 0, 0)));
+        }
+        else if (inputY != 0)
+        {
+            StartCoroutine(MoveToGrid(new Vector3(0, inputY, 0)));
         }
     }
 
-    private void HandleMovement()
+    private IEnumerator MoveToGrid(Vector3 direction)
     {
-        float inputX = Input.GetAxisRaw("Horizontal");
-        float inputY = Input.GetAxisRaw("Vertical");
+        isMoving = true;
+        Vector3 targetPosition = transform.position + direction;
 
-        if (inputX != 0 || inputY != 0)
+        // プレイヤーは縦2マスなので、進む先の「足元」と「頭上(+1のY座標)」の2箇所をチェックする
+        Vector2 footPos = targetPosition;
+        Vector2 headPos = targetPosition + Vector3.up; 
+
+        // 足元と頭上のどちらかに障害物がないか調べる
+        Collider2D hitFoot = Physics2D.OverlapPoint(footPos);
+        Collider2D hitHead = Physics2D.OverlapPoint(headPos);
+
+        // 自分自身（PlayerのCollider）を検知した場合は無視するための処理
+        if (hitFoot != null && hitFoot.gameObject == this.gameObject) hitFoot = null;
+        if (hitHead != null && hitHead.gameObject == this.gameObject) hitHead = null;
+
+        // 何かにぶつかった場合の判定
+        if (hitFoot != null || hitHead != null)
         {
-            Vector2 moveDirection = new Vector2(inputX, inputY).normalized;
+            // ぶつかった対象が「壁（Wallタグ）」なら移動キャンセル
+            if ((hitFoot != null && hitFoot.CompareTag("Wall")) || 
+                (hitHead != null && hitHead.CompareTag("Wall")))
+            {
+                yield break; // コルーチンを終了して移動しない
+            }
 
-            transform.Translate(moveDirection * moveSpeed * Time.deltaTime);
+            // ぶつかった対象が「木箱」の場合
+            MovableBox box = null;
+            if (hitFoot != null) box = hitFoot.GetComponent<MovableBox>();
+            if (hitHead != null && box == null) box = hitHead.GetComponent<MovableBox>();
 
-            if (Mathf.Abs(inputX) > 0.1f) facingDirection = new Vector2(Mathf.Sign(inputX), 0);
-            else if (Mathf.Abs(inputY) > 0.1f) facingDirection = new Vector2(0, Mathf.Sign(inputY));
-        }
-    }
-
-    private void TryInteract()
-    {
-        Vector3 footPosition = transform.position + new Vector3(0, -0.5f, 0);
-
-        Vector3Int currentCell = grid.WorldToCell(footPosition);
-
-        Vector3Int targetCell = currentCell + new Vector3Int((int)facingDirection.x, (int)facingDirection.y, 0);
-
-        Vector3 targetWorldCenter = grid.GetCellCenterWorld(targetCell);
-        debugTargetCenter = targetWorldCenter;
-        Debug.Log($"現在マス:{currentCell} / 調べるマス:{targetCell} / 向き:{facingDirection}");
-        Collider2D hitObj = Physics2D.OverlapCircle(targetWorldCenter, 0.8f, interactableLayer);
-
-        if (hitObj != null)
-        {
-            Debug.Log("a");
-            MovableBox box = hitObj.GetComponent<MovableBox>();
             if (box != null)
             {
-                Debug.Log("b");
-                box.Interact(facingDirection);
-                return;
+                // 木箱の先のマスが空いているか確認
+                if (box.CanMove(direction))
+                {
+                    box.Push(direction); // 木箱を1マス動かす
+                }
+                else
+                {
+                    // 木箱が動かせない（奥が壁など）なら、プレイヤーも進めない
+                    yield break; 
+                }
             }
         }
 
-        if (interactableTilemap != null)
+        while (Vector3.Distance(transform.position, targetPosition) > 0.01f)
         {
-            TileBase hitTile = interactableTilemap.GetTile(targetCell);
-            if (hitTile != null)
-            {
-                Debug.Log($"タイル（{hitTile.name}）を発見しました！");
-                return;
-            }
+            transform.position = Vector3.MoveTowards(transform.position, targetPosition, moveSpeed * Time.deltaTime);
+            yield return null;
         }
 
-        Debug.Log("目の前には何もありません。");
+        transform.position = targetPosition;
+        isMoving = false;
+
+        
+        // === 障害物チェックここまで ===
+
+        // 障害物がなければ（または箱を押し込めたら）、自身の移動を開始する
+        while (Vector3.Distance(transform.position, targetPosition) > 0.01f)
+        {
+            transform.position = Vector3.MoveTowards(transform.position, targetPosition, moveSpeed * Time.deltaTime);
+            yield return null;
+        }
+
+        transform.position = targetPosition;
     }
-
-    // UnityエディタのSceneビューに、判定の円を描画する機能
-    private void OnDrawGizmos()
-    {
-        // 調べている場所（赤い円）
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(debugTargetCenter, 0.8f);
-
-        // プレイヤーが向いている方向（緑の線）
-        Gizmos.color = Color.green;
-        Gizmos.DrawRay(transform.position, facingDirection);
-    }
-
 }
+
+        
