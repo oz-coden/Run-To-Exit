@@ -13,4 +13,6 @@ MonoBehaviour:
   m_Name: Stage 1
   m_EditorClassIdentifier: Assembly-CSharp::RunToExit.Core.LevelData
   LevelName: Stage 1
-  MapLayout: "P B  \n#####"
+  MapLayout: 'P   N        B
+
+    ###############'

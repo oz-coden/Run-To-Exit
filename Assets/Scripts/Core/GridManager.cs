@@ -21,8 +21,18 @@ namespace RunToExit.Core
         // 整数座標での障害物チェック
         public Collider2D GetObjectAt(Vector2Int gridPos)
         {
-            // Physics2Dを用いて、スクリプト制御のためのグリッド確認を行う
-            return Physics2D.OverlapPoint(new Vector2(gridPos.x, gridPos.y));
+            Collider2D[] hits = Physics2D.OverlapPointAll(new Vector2(gridPos.x, gridPos.y));
+            if (hits.Length == 0) return null;
+
+            // 優先的に壁や木箱などの足場を返す（他のトリガーなどに隠されないようにする）
+            foreach (var hit in hits)
+            {
+                if (hit.CompareTag(TagName.Wall) || hit.GetComponent<MovableBox>() != null)
+                {
+                    return hit;
+                }
+            }
+            return hits[0];
         }
 
         public bool IsWallAt(Vector2Int gridPos)

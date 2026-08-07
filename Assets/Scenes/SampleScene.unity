@@ -130,6 +130,7 @@ GameObject:
   - component: {fileID: 104049114}
   - component: {fileID: 104049113}
   - component: {fileID: 104049115}
+  - component: {fileID: 104049116}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -181,6 +182,18 @@ MonoBehaviour:
   playerPrefab: {fileID: 3117642145131702409, guid: aa47e472fc7484944bf312f70bf312db, type: 3}
   boxPrefab: {fileID: 8999537849147829984, guid: 2279058bced2dae40a9bc1078d44ba1c, type: 3}
   startPosition: {x: 0, y: 0}
+--- !u!114 &104049116
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 104049112}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2674dda62569d564998d37605199002a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RunToExit.Core.CommandManager
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
