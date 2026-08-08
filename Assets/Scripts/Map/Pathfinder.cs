@@ -85,16 +85,16 @@ namespace RunToExit.Core
                 Vector2Int nextPos = node.Position + new Vector2Int(dir, 0);
 
                 // 1. 通常の歩行（横移動）
-                Collider2D hitFoot = GridManager.Instance.GetObjectAt(nextPos);
-                Collider2D hitHead = GridManager.Instance.GetObjectAt(nextPos + Vector2Int.up);
+                RunToExit.Map.GridNode footNode = RunToExit.Map.GridManager.Instance.GetNode(nextPos);
+                RunToExit.Map.GridNode headNode = RunToExit.Map.GridManager.Instance.GetNode(nextPos + Vector2Int.up);
 
                 // 障害物がない場合
-                if (hitFoot == null && hitHead == null)
+                if (!footNode.IsSolid(character) && !headNode.IsSolid(character))
                 {
                     // 落下するかチェック
                     Vector2Int checkFallPos = nextPos;
                     int fallDepth = 0;
-                    while (GridManager.Instance.GetObjectAt(checkFallPos + Vector2Int.down) == null)
+                    while (!RunToExit.Map.GridManager.Instance.GetNode(checkFallPos + Vector2Int.down).IsSolid(character))
                     {
                         checkFallPos += Vector2Int.down;
                         fallDepth++;
@@ -107,15 +107,15 @@ namespace RunToExit.Core
                     }
                 }
                 // 2. 段差ジャンプ（上へ1マス）
-                else if (hitFoot != null && (hitFoot.CompareTag(TagName.Wall) || hitFoot.GetComponent<MovableBox>() != null))
+                else if (footNode.IsSolid(character))
                 {
                     Vector2Int stepPos = nextPos + Vector2Int.up;
                     Vector2Int aboveHead = stepPos + Vector2Int.up;
                     Vector2Int currentAbove = node.Position + Vector2Int.up * 2;
 
-                    if (GridManager.Instance.GetObjectAt(stepPos) == null &&
-                        GridManager.Instance.GetObjectAt(aboveHead) == null &&
-                        GridManager.Instance.GetObjectAt(currentAbove) == null)
+                    if (!RunToExit.Map.GridManager.Instance.GetNode(stepPos).IsSolid(character) &&
+                        !RunToExit.Map.GridManager.Instance.GetNode(aboveHead).IsSolid(character) &&
+                        !RunToExit.Map.GridManager.Instance.GetNode(currentAbove).IsSolid(character))
                     {
                         neighbors.Add(new PathNode(stepPos));
                     }
