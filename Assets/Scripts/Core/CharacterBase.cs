@@ -387,6 +387,12 @@ namespace RunToExit.Core
             Destroy(item.gameObject);
         }
 
+        public void ConsumeItem()
+        {
+            HeldItem = null;
+            if (heldItemVisual != null) heldItemVisual.SetActive(false);
+        }
+
         public void UseItemOn(InteractableBase target)
         {
             if (HeldItem == null) return;

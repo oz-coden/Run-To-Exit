@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RunToExit.Core
@@ -5,6 +6,8 @@ namespace RunToExit.Core
     public class GridManager : MonoBehaviour
     {
         public static GridManager Instance { get; private set; }
+
+        private Dictionary<Vector2Int, GridNode> gridData = new Dictionary<Vector2Int, GridNode>();
 
         private void Awake()
         {
@@ -18,27 +21,51 @@ namespace RunToExit.Core
             }
         }
 
-        // 整数座標での障害物チェック
-        public Collider2D GetObjectAt(Vector2Int gridPos)
+        public void ClearGrid()
         {
-            Collider2D[] hits = Physics2D.OverlapPointAll(new Vector2(gridPos.x, gridPos.y));
-            if (hits.Length == 0) return null;
+            gridData.Clear();
+        }
 
-            // 優先的に壁や木箱などの足場を返す（他のトリガーなどに隠されないようにする）
-            foreach (var hit in hits)
+        public GridNode GetNode(Vector2Int pos)
+        {
+            if (!gridData.TryGetValue(pos, out GridNode node))
             {
-                if (hit.CompareTag(TagName.Wall) || hit.GetComponent<MovableBox>() != null)
-                {
-                    return hit;
-                }
+                node = new GridNode(pos);
+                gridData[pos] = node;
             }
-            return hits[0];
+            return node;
+        }
+
+        public void AddWall(Vector2Int pos)
+        {
+            GetNode(pos).IsWall = true;
+        }
+
+        public void AddEntity(IGridEntity entity)
+        {
+            GetNode(entity.GridPosition).Entities.Add(entity);
+        }
+
+        public void RemoveEntity(IGridEntity entity)
+        {
+            GetNode(entity.GridPosition).Entities.Remove(entity);
+        }
+
+        public void MoveEntity(IGridEntity entity, Vector2Int oldPos, Vector2Int newPos)
+        {
+            GetNode(oldPos).Entities.Remove(entity);
+            GetNode(newPos).Entities.Add(entity);
         }
 
         public bool IsWallAt(Vector2Int gridPos)
         {
-            Collider2D col = GetObjectAt(gridPos);
-            return col != null && col.CompareTag(TagName.Wall);
+            return GetNode(gridPos).IsWall;
+        }
+
+        // 旧コード互換性
+        public Collider2D GetObjectAt(Vector2Int gridPos)
+        {
+            return Physics2D.OverlapPoint(new Vector2(gridPos.x, gridPos.y));
         }
 
         public T GetComponentAt<T>(Vector2Int gridPos) where T : Component

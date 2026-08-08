@@ -5,8 +5,8 @@ namespace RunToExit.Core
     public enum ItemType
     {
         Extinguisher,
-        Key, // 将来用
-        Rope // 将来用
+        Key,
+        Rope
     }
 
     public class ItemBase : InteractableBase
