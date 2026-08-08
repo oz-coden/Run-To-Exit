@@ -25,27 +25,47 @@ namespace RunToExit.Core
 
             foreach (var step in path)
             {
-                if (character.State != CharacterState.Idle)
+                if (character.State != CharacterBase.CharacterState.Idle)
                 {
-                    while (character.State != CharacterState.Idle) yield return null;
+                    while (character.State != CharacterBase.CharacterState.Idle) yield return null;
                 }
 
                 // 進行方向を計算
                 int dirX = step.x > character.GridPosition.x ? 1 : (step.x < character.GridPosition.x ? -1 : 0);
+                int dirY = step.y - character.GridPosition.y;
 
-                if (step.y > character.GridPosition.y)
+                if (dirY != 0)
                 {
-                    if (step.x != character.GridPosition.x)
+                    if (dirX == 0)
                     {
-                        if (!character.TryStepUp(step)) yield break;
+                        // 垂直移動＝ハシゴ
+                        if (!character.TryClimbLadder(dirY)) yield break;
                     }
                     else
                     {
-                        // よじ登りロジックは幅跳びや特殊操作に依存
-                        yield break; 
+                        // 斜め移動＝階段 or 段差
+                        bool hasStairs = GridManager.Instance.GetNode(character.GridPosition).GetEntity<Stairs>() != null || 
+                                         GridManager.Instance.GetNode(step).GetEntity<Stairs>() != null;
+                        
+                        if (hasStairs)
+                        {
+                            if (!character.TryMoveStairs(step)) yield break;
+                        }
+                        else
+                        {
+                            if (dirY > 0)
+                            {
+                                if (!character.TryStepUp(step)) yield break;
+                            }
+                            else
+                            {
+                                // 落下を伴う移動（飛び降りなど）はとりあえず横移動として扱い、CheckFallに任せる
+                                if (!character.TryMove(dirX)) yield break;
+                            }
+                        }
                     }
                 }
-                else if (Mathf.Abs(step.x - character.GridPosition.x) > 1 && step.y == character.GridPosition.y)
+                else if (Mathf.Abs(step.x - character.GridPosition.x) > 1)
                 {
                     if (!character.TryLongJump(dirX)) yield break;
                 }
@@ -55,7 +75,7 @@ namespace RunToExit.Core
                 }
 
                 // 次の移動まで待機
-                while (character.State != CharacterState.Idle) yield return null;
+                while (character.State != CharacterBase.CharacterState.Idle) yield return null;
             }
         }
     }

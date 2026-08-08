@@ -1,15 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
-using RunToExit.Entities.Characters;
-using RunToExit.Entities.Gimmicks;
-using RunToExit.Entities.Items;
 
-namespace RunToExit.Map
+namespace RunToExit.Core
 {
     public class MapGenerator : MonoBehaviour
     {
         [Header("Level Data")]
-        public RunToExit.App.LevelData currentLevel;
+        public LevelData currentLevel;
 
         [Header("Prefabs")]
         public GameObject wallPrefab;
@@ -22,6 +19,8 @@ namespace RunToExit.Map
         public GameObject doorPrefab;
         public GameObject exitPrefab;
         public GameObject keyPrefab;
+        public GameObject ladderPrefab;
+        public GameObject stairsPrefab;
 
         [Header("Settings")]
         public Vector2 startPosition = Vector2.zero; // マップの左下などの基準点
@@ -80,12 +79,15 @@ namespace RunToExit.Map
             else if (tile == 'X') prefabToSpawn = exitPrefab;
             else if (tile == 'D') { prefabToSpawn = doorPrefab; isManualDoor = true; }
             else if (tile == 'L') { prefabToSpawn = doorPrefab; isLockedDoor = true; }
+            else if (tile == 'H') prefabToSpawn = ladderPrefab;
+            else if (tile == '/') prefabToSpawn = stairsPrefab;
+            else if (tile == '\\') prefabToSpawn = stairsPrefab;
             else if (char.IsLower(tile) && tile >= 'a' && tile <= 'z') 
             { 
                 prefabToSpawn = switchPrefab; 
                 isLinkedSwitch = true; 
             }
-            else if (char.IsUpper(tile) && tile >= 'A' && tile <= 'Z' && tile != 'P' && tile != 'N' && tile != 'B' && tile != 'F' && tile != 'E' && tile != 'K' && tile != 'X' && tile != 'D' && tile != 'L')
+            else if (char.IsUpper(tile) && tile >= 'A' && tile <= 'Z' && tile != 'P' && tile != 'N' && tile != 'B' && tile != 'F' && tile != 'E' && tile != 'K' && tile != 'X' && tile != 'D' && tile != 'L' && tile != 'H')
             {
                 prefabToSpawn = doorPrefab;
                 isLinkedDoor = true;
@@ -96,6 +98,15 @@ namespace RunToExit.Map
                 if (isPlayerOrNpc) position.y += 0.5f;
 
                 GameObject obj = Instantiate(prefabToSpawn, position, Quaternion.identity, this.transform);
+
+                if (tile == '\\' && obj.GetComponent<Stairs>() != null)
+                {
+                    obj.GetComponent<Stairs>().Direction = StairDirection.LeftUp;
+                }
+                else if (tile == '/' && obj.GetComponent<Stairs>() != null)
+                {
+                    obj.GetComponent<Stairs>().Direction = StairDirection.RightUp;
+                }
 
                 if (isLinkedSwitch)
                 {

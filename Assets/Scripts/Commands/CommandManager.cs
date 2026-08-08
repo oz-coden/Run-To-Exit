@@ -56,24 +56,24 @@ namespace RunToExit.Core
             {
                 if (isTargetingItemUse)
                 {
-                    RunToExit.Map.GridNode node = RunToExit.Map.GridManager.Instance.GetNode(gridPos);
+                    GridNode node = GridManager.Instance.GetNode(gridPos);
                     InteractableBase targetInteractable = node.GetEntity<InteractableBase>();
                     
                     if (targetInteractable != null)
                     {
-                        SelectedNPC.AddCommand(new RunToExit.Core.UseItemCommand(targetInteractable));
+                        SelectedNPC.AddCommand(new UseItemCommand(targetInteractable));
                     }
                     else
                     {
                         // 何も無い場合はその場に移動する
-                        SelectedNPC.AddCommand(new RunToExit.Core.MoveCommand(gridPos));
+                        SelectedNPC.AddCommand(new MoveCommand(gridPos));
                     }
                     isTargetingItemUse = false; // 一度指示したら解除
                 }
                 else
                 {
                     // 普通の移動指示
-                    SelectedNPC.AddCommand(new RunToExit.Core.MoveCommand(gridPos));
+                    SelectedNPC.AddCommand(new MoveCommand(gridPos));
                 }
             }
         }

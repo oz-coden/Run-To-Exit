@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using RunToExit.Commands;
 
 namespace RunToExit.Core
 {
@@ -9,6 +8,15 @@ namespace RunToExit.Core
     {
         private Queue<ICommand> commandQueue = new Queue<ICommand>();
         private Coroutine currentCommandCoroutine;
+
+        public bool IsRescued { get; private set; } = false;
+
+        public void Rescue()
+        {
+            IsRescued = true;
+            CommandManager.Instance.SelectNPC(this);
+            Debug.Log($"{gameObject.name} was rescued!");
+        }
 
         public void AddCommand(ICommand command)
         {

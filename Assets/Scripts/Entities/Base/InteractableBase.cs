@@ -15,14 +15,14 @@ namespace RunToExit.Core
 
         protected virtual void Start()
         {
-            RunToExit.Map.GridManager.Instance.AddEntity(this);
+            GridManager.Instance.AddEntity(this);
         }
 
         protected virtual void OnDestroy()
         {
-            if (RunToExit.Map.GridManager.Instance != null)
+            if (GridManager.Instance != null)
             {
-                RunToExit.Map.GridManager.Instance.RemoveEntity(this);
+                GridManager.Instance.RemoveEntity(this);
             }
         }
 

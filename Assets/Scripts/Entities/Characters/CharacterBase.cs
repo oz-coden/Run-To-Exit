@@ -14,6 +14,7 @@ namespace RunToExit.Core
         [Header("Character Stats")]
         public int Power = 1;
         public float MoveSpeed = 5f;
+        public float FallSpeed = 10f;
         public int ClimbLimit = 3;
 
         public enum CharacterState
@@ -24,27 +25,28 @@ namespace RunToExit.Core
             Jumping,      // 段差ジャンプ(+1)
             Hanging,      // ぶら下がり
             Climbing,     // よじ登り
-            LongJumping   // 幅跳び
+            LongJumping,  // 幅跳び
+            ClimbingLadder, // ハシゴ昇降
+            WalkingStairs   // 階段移動
         }
 
-        public CharacterState State { get; protected set; } = CharacterState.Idle;
-        public int FacingDirection { get; protected set; } = 1;
+        public int FacingDirection { get; set; } = 1;
 
         protected float visualYOffset = 0f;
 
         protected virtual void Start()
         {
             InitializePosition();
-            RunToExit.Map.GridManager.Instance.AddEntity(this);
+            GridManager.Instance.AddEntity(this);
             // Y座標の初期オフセットを記録（MapGenerator等で+0.5された場合への対応）
             visualYOffset = transform.position.y - Mathf.Floor(transform.position.y);
         }
 
         protected virtual void OnDestroy()
         {
-            if (RunToExit.Map.GridManager.Instance != null)
+            if (GridManager.Instance != null)
             {
-                RunToExit.Map.GridManager.Instance.RemoveEntity(this);
+                GridManager.Instance.RemoveEntity(this);
             }
         }
 
@@ -85,8 +87,8 @@ namespace RunToExit.Core
                 return false;
             }
 
-            RunToExit.Map.GridNode footNode = RunToExit.Map.GridManager.Instance.GetNode(targetPos);
-            RunToExit.Map.GridNode headNode = RunToExit.Map.GridManager.Instance.GetNode(targetPos + Vector2Int.up);
+            GridNode footNode = GridManager.Instance.GetNode(targetPos);
+            GridNode headNode = GridManager.Instance.GetNode(targetPos + Vector2Int.up);
 
             if (footNode.IsWall || headNode.IsWall) return false;
 
@@ -100,7 +102,11 @@ namespace RunToExit.Core
                 {
                     interactable = inter;
                     if (inter.IsSolidTo(this)) footIsObstacle = true;
-                    if (inter is MovableBox box) pushableBox = box;
+                }
+                else if (entity is MovableBox box)
+                {
+                    pushableBox = box;
+                    footIsObstacle = true;
                 }
                 else if (entity.IsSolidTo(this)) footIsObstacle = true;
             }
@@ -131,7 +137,7 @@ namespace RunToExit.Core
                 boxToPush.PushTo(boxTarget);
             }
 
-            RunToExit.Map.GridManager.Instance.MoveEntity(this, GridPosition, targetPos);
+            GridManager.Instance.MoveEntity(this, GridPosition, targetPos);
             GridPosition = targetPos;
             int dirX = targetPos.x > GridPosition.x ? 1 : (targetPos.x < GridPosition.x ? -1 : 0);
             if (dirX != 0) FacingDirection = dirX;
@@ -152,8 +158,10 @@ namespace RunToExit.Core
         {
             if (State != CharacterState.Idle) return;
 
+            if (GridManager.Instance.GetNode(GridPosition).GetEntity<Ladder>() != null) return;
+
             Vector2Int below = GridPosition + Vector2Int.down;
-            RunToExit.Map.GridNode node = RunToExit.Map.GridManager.Instance.GetNode(below);
+            GridNode node = GridManager.Instance.GetNode(below);
 
             if (!node.IsSolid(this))
             {
@@ -168,7 +176,7 @@ namespace RunToExit.Core
             while (true)
             {
                 Vector2Int below = GridPosition + Vector2Int.down;
-                RunToExit.Map.GridNode node = RunToExit.Map.GridManager.Instance.GetNode(below);
+                GridNode node = GridManager.Instance.GetNode(below);
                 
                 if (node.IsSolid(this))
                 {
@@ -183,12 +191,23 @@ namespace RunToExit.Core
                 }
                 transform.position = endPos;
 
-                RunToExit.Map.GridManager.Instance.MoveEntity(this, GridPosition, below);
+                GridManager.Instance.MoveEntity(this, GridPosition, below);
                 GridPosition = below;
             }
             
             State = CharacterState.Idle;
             CheckFall();
+        }
+
+        public virtual bool TryMove(int dirX)
+        {
+            Vector2Int targetPos = GridPosition + new Vector2Int(dirX, 0);
+            if (CanMoveTo(targetPos, out MovableBox boxToPush, out NPCController npcHit, out InteractableBase interactable))
+            {
+                StartCoroutine(MoveRoutine(targetPos, boxToPush));
+                return true;
+            }
+            return false;
         }
 
         public virtual bool TryStepUp(Vector2Int targetPos)
@@ -197,11 +216,11 @@ namespace RunToExit.Core
             Vector2Int targetStep = targetPos + Vector2Int.up;
             Vector2Int targetAboveHead = targetStep + Vector2Int.up;
 
-            if (RunToExit.Map.GridManager.Instance.GetNode(currentAboveHead).IsSolid(this)) return false;
-            if (RunToExit.Map.GridManager.Instance.GetNode(targetStep).IsSolid(this)) return false;
-            if (RunToExit.Map.GridManager.Instance.GetNode(targetAboveHead).IsSolid(this)) return false;
+            if (GridManager.Instance.GetNode(currentAboveHead).IsSolid(this)) return false;
+            if (GridManager.Instance.GetNode(targetStep).IsSolid(this)) return false;
+            if (GridManager.Instance.GetNode(targetAboveHead).IsSolid(this)) return false;
 
-            if (!RunToExit.Map.GridManager.Instance.GetNode(targetPos).IsSolid(this)) return false;
+            if (!GridManager.Instance.GetNode(targetPos).IsSolid(this)) return false;
 
             StartCoroutine(StepUpRoutine(targetStep));
             return true;
@@ -238,16 +257,16 @@ namespace RunToExit.Core
                 Vector2Int landPos = GridPosition + new Vector2Int(dirX * dist, 0);
                 Vector2Int belowLandPos = landPos + Vector2Int.down;
 
-                if (RunToExit.Map.GridManager.Instance.GetNode(landPos).IsSolid(this)) continue;
-                if (RunToExit.Map.GridManager.Instance.GetNode(landPos + Vector2Int.up).IsSolid(this)) continue;
-                if (!RunToExit.Map.GridManager.Instance.GetNode(belowLandPos).IsSolid(this)) continue;
+                if (GridManager.Instance.GetNode(landPos).IsSolid(this)) continue;
+                if (GridManager.Instance.GetNode(landPos + Vector2Int.up).IsSolid(this)) continue;
+                if (!GridManager.Instance.GetNode(belowLandPos).IsSolid(this)) continue;
 
                 bool pathClear = true;
                 for (int i = 1; i < dist; i++)
                 {
                     Vector2Int pathPos = GridPosition + new Vector2Int(dirX * i, 0);
-                    if (RunToExit.Map.GridManager.Instance.GetNode(pathPos).IsSolid(this) || 
-                        RunToExit.Map.GridManager.Instance.GetNode(pathPos + Vector2Int.up).IsSolid(this))
+                    if (GridManager.Instance.GetNode(pathPos).IsSolid(this) || 
+                        GridManager.Instance.GetNode(pathPos + Vector2Int.up).IsSolid(this))
                     {
                         pathClear = false;
                         break;
@@ -297,9 +316,9 @@ namespace RunToExit.Core
                 Vector2Int grabWallPos = GridPosition + new Vector2Int(dirX, h - 1);
                 Vector2Int standPos = GridPosition + new Vector2Int(dirX, h);
 
-                if (!RunToExit.Map.GridManager.Instance.GetNode(grabWallPos).IsSolid(this)) continue;
-                if (RunToExit.Map.GridManager.Instance.GetNode(standPos).IsSolid(this)) continue;
-                if (RunToExit.Map.GridManager.Instance.GetNode(standPos + Vector2Int.up).IsSolid(this)) continue;
+                if (!GridManager.Instance.GetNode(grabWallPos).IsSolid(this)) continue;
+                if (GridManager.Instance.GetNode(standPos).IsSolid(this)) continue;
+                if (GridManager.Instance.GetNode(standPos + Vector2Int.up).IsSolid(this)) continue;
 
                 StartCoroutine(LedgeGrabRoutine(h, standPos));
                 return true;
@@ -331,6 +350,80 @@ namespace RunToExit.Core
             }
             transform.position = standVisualPos;
 
+            State = CharacterState.Idle;
+            CheckFall();
+        }
+
+        public virtual bool TryClimbLadder(int dirY)
+        {
+            Vector2Int targetPos = GridPosition + new Vector2Int(0, dirY);
+            
+            // 自分か移動先がハシゴである必要がある
+            bool onLadder = GridManager.Instance.GetNode(GridPosition).GetEntity<Ladder>() != null;
+            bool targetHasLadder = GridManager.Instance.GetNode(targetPos).GetEntity<Ladder>() != null;
+
+            if (!onLadder && !targetHasLadder) return false;
+
+            // 頭上や足元に障害物がないか確認
+            if (dirY > 0)
+            {
+                if (GridManager.Instance.GetNode(GridPosition + Vector2Int.up * 2).IsSolid(this)) return false;
+            }
+            else
+            {
+                if (GridManager.Instance.GetNode(targetPos).IsSolid(this)) return false;
+            }
+
+            StartCoroutine(ClimbLadderRoutine(targetPos));
+            return true;
+        }
+
+        protected IEnumerator ClimbLadderRoutine(Vector2Int targetPos)
+        {
+            State = CharacterState.ClimbingLadder;
+            GridManager.Instance.MoveEntity(this, GridPosition, targetPos);
+            GridPosition = targetPos;
+
+            Vector3 endPos = new Vector3(targetPos.x, targetPos.y + visualYOffset, 0);
+            while (Vector3.Distance(transform.position, endPos) > 0.01f)
+            {
+                transform.position = Vector3.MoveTowards(transform.position, endPos, MoveSpeed * Time.deltaTime);
+                yield return null;
+            }
+            transform.position = endPos;
+            State = CharacterState.Idle;
+            CheckFall();
+        }
+
+        public virtual bool TryMoveStairs(Vector2Int targetPos)
+        {
+            // 階段の移動先には障害物がないこと
+            if (GridManager.Instance.GetNode(targetPos).IsSolid(this) ||
+                GridManager.Instance.GetNode(targetPos + Vector2Int.up).IsSolid(this))
+            {
+                return false;
+            }
+
+            StartCoroutine(MoveStairsRoutine(targetPos));
+            return true;
+        }
+
+        protected IEnumerator MoveStairsRoutine(Vector2Int targetPos)
+        {
+            State = CharacterState.WalkingStairs;
+            int dirX = targetPos.x > GridPosition.x ? 1 : -1;
+            FacingDirection = dirX;
+
+            GridManager.Instance.MoveEntity(this, GridPosition, targetPos);
+            GridPosition = targetPos;
+
+            Vector3 endPos = new Vector3(targetPos.x, targetPos.y + visualYOffset, 0);
+            while (Vector3.Distance(transform.position, endPos) > 0.01f)
+            {
+                transform.position = Vector3.MoveTowards(transform.position, endPos, MoveSpeed * Time.deltaTime);
+                yield return null;
+            }
+            transform.position = endPos;
             State = CharacterState.Idle;
             CheckFall();
         }

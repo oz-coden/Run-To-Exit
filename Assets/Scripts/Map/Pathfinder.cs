@@ -78,15 +78,55 @@ namespace RunToExit.Core
         private static List<PathNode> GetNeighbors(CharacterBase character, PathNode node)
         {
             List<PathNode> neighbors = new List<PathNode>();
+            
+            // 3. ハシゴの昇降
+            bool onLadder = GridManager.Instance.GetNode(node.Position).GetEntity<Ladder>() != null;
+            if (onLadder)
+            {
+                // 上へ
+                Vector2Int upPos = node.Position + Vector2Int.up;
+                if (!GridManager.Instance.GetNode(upPos).IsSolid(character) && 
+                    !GridManager.Instance.GetNode(upPos + Vector2Int.up).IsSolid(character))
+                {
+                    neighbors.Add(new PathNode(upPos));
+                }
+            }
+            
+            // 足元にハシゴがある場合（降りる）
+            if (GridManager.Instance.GetNode(node.Position + Vector2Int.down).GetEntity<Ladder>() != null)
+            {
+                neighbors.Add(new PathNode(node.Position + Vector2Int.down));
+            }
+
             int[] directions = { -1, 1 }; // 左右
 
             foreach (int dir in directions)
             {
                 Vector2Int nextPos = node.Position + new Vector2Int(dir, 0);
 
-                // 1. 通常の歩行（横移動）
-                RunToExit.Map.GridNode footNode = RunToExit.Map.GridManager.Instance.GetNode(nextPos);
-                RunToExit.Map.GridNode headNode = RunToExit.Map.GridManager.Instance.GetNode(nextPos + Vector2Int.up);
+                // 階段の処理（斜め移動）
+                Stairs currentStairs = GridManager.Instance.GetNode(node.Position).GetEntity<Stairs>();
+                if (currentStairs != null)
+                {
+                    if (currentStairs.Direction == StairDirection.RightUp)
+                        nextPos += (dir == 1) ? Vector2Int.up : Vector2Int.down;
+                    else if (currentStairs.Direction == StairDirection.LeftUp)
+                        nextPos += (dir == -1) ? Vector2Int.up : Vector2Int.down;
+                }
+                else
+                {
+                    // 移動先が階段の場合（階段の登り始め）
+                    Stairs nextStairs = GridManager.Instance.GetNode(nextPos).GetEntity<Stairs>();
+                    if (nextStairs != null)
+                    {
+                        if (nextStairs.Direction == StairDirection.RightUp && dir == 1) nextPos += Vector2Int.up;
+                        else if (nextStairs.Direction == StairDirection.LeftUp && dir == -1) nextPos += Vector2Int.up;
+                    }
+                }
+
+                // 1. 通常の歩行または階段（横・斜め移動）
+                GridNode footNode = GridManager.Instance.GetNode(nextPos);
+                GridNode headNode = GridManager.Instance.GetNode(nextPos + Vector2Int.up);
 
                 // 障害物がない場合
                 if (!footNode.IsSolid(character) && !headNode.IsSolid(character))
@@ -94,7 +134,7 @@ namespace RunToExit.Core
                     // 落下するかチェック
                     Vector2Int checkFallPos = nextPos;
                     int fallDepth = 0;
-                    while (!RunToExit.Map.GridManager.Instance.GetNode(checkFallPos + Vector2Int.down).IsSolid(character))
+                    while (!GridManager.Instance.GetNode(checkFallPos + Vector2Int.down).IsSolid(character))
                     {
                         checkFallPos += Vector2Int.down;
                         fallDepth++;
@@ -113,9 +153,9 @@ namespace RunToExit.Core
                     Vector2Int aboveHead = stepPos + Vector2Int.up;
                     Vector2Int currentAbove = node.Position + Vector2Int.up * 2;
 
-                    if (!RunToExit.Map.GridManager.Instance.GetNode(stepPos).IsSolid(character) &&
-                        !RunToExit.Map.GridManager.Instance.GetNode(aboveHead).IsSolid(character) &&
-                        !RunToExit.Map.GridManager.Instance.GetNode(currentAbove).IsSolid(character))
+                    if (!GridManager.Instance.GetNode(stepPos).IsSolid(character) &&
+                        !GridManager.Instance.GetNode(aboveHead).IsSolid(character) &&
+                        !GridManager.Instance.GetNode(currentAbove).IsSolid(character))
                     {
                         neighbors.Add(new PathNode(stepPos));
                     }

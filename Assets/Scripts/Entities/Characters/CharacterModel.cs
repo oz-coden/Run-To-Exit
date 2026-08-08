@@ -15,7 +15,7 @@ namespace RunToExit.Core
         public CharacterType Type { get; private set; }
         public Vector2Int GridPosition { get; set; }
         public int FacingDirection { get; set; } = 1;
-        public CharacterState State { get; set; } = CharacterState.Idle;
+        public CharacterBase.CharacterState State { get; set; } = CharacterBase.CharacterState.Idle;
         public ItemType? HeldItem { get; set; }
 
         // パラメータ
