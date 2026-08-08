@@ -7,6 +7,12 @@ namespace RunToExit.Core
     {
         public bool IsOn { get; private set; } = false;
         
+        [SerializeField] private float requiredWeight = 1f; 
+        
+        [Header("Linked Door")]
+        public Door targetDoor;
+
+        [Header("Events (Optional)")]
         public UnityEvent OnActivated;
         public UnityEvent OnDeactivated;
 
@@ -38,6 +44,11 @@ namespace RunToExit.Core
                 Debug.Log($"{gameObject.name} Activated");
                 GetComponent<SpriteRenderer>().color = Color.green; // 仮の見た目変化
                 OnActivated?.Invoke();
+
+                if (targetDoor != null && targetDoor.Type == DoorType.Switch)
+                {
+                    targetDoor.OpenDoor();
+                }
             }
             else if (!hasWeight && IsOn)
             {
@@ -45,6 +56,11 @@ namespace RunToExit.Core
                 Debug.Log($"{gameObject.name} Deactivated");
                 GetComponent<SpriteRenderer>().color = Color.red; // 仮の見た目変化
                 OnDeactivated?.Invoke();
+
+                if (targetDoor != null && targetDoor.Type == DoorType.Switch)
+                {
+                    targetDoor.CloseDoor();
+                }
             }
         }
     }
