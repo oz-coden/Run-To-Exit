@@ -5,6 +5,8 @@ namespace RunToExit.Core
 {
     public class MapGenerator : MonoBehaviour
     {
+        public static MapGenerator Instance { get; private set; }
+
         [Header("Level Data")]
         public LevelData currentLevel;
 
@@ -21,6 +23,8 @@ namespace RunToExit.Core
         public GameObject keyPrefab;
         public GameObject ladderPrefab;
         public GameObject stairsPrefab;
+        public GameObject ropePrefab;
+        public GameObject ropeAnchorPrefab;
 
         [Header("Settings")]
         public Vector2 startPosition = Vector2.zero; // マップの左下などの基準点
@@ -28,6 +32,12 @@ namespace RunToExit.Core
         // スイッチとドアのリンク用一時辞書
         private Dictionary<char, PressureSwitch> pendingSwitches = new Dictionary<char, PressureSwitch>();
         private Dictionary<char, Door> pendingDoors = new Dictionary<char, Door>();
+
+        private void Awake()
+        {
+            if (Instance == null) Instance = this;
+            else Destroy(gameObject);
+        }
 
         private void Start()
         {
@@ -76,6 +86,8 @@ namespace RunToExit.Core
             else if (tile == 'F') prefabToSpawn = firePrefab;
             else if (tile == 'E') prefabToSpawn = extinguisherPrefab;
             else if (tile == 'K') prefabToSpawn = keyPrefab;
+            else if (tile == 'R') prefabToSpawn = ropePrefab;
+            else if (tile == 'U') prefabToSpawn = ropeAnchorPrefab;
             else if (tile == 'X') prefabToSpawn = exitPrefab;
             else if (tile == 'D') { prefabToSpawn = doorPrefab; isManualDoor = true; }
             else if (tile == 'L') { prefabToSpawn = doorPrefab; isLockedDoor = true; }
@@ -87,7 +99,7 @@ namespace RunToExit.Core
                 prefabToSpawn = switchPrefab; 
                 isLinkedSwitch = true; 
             }
-            else if (char.IsUpper(tile) && tile >= 'A' && tile <= 'Z' && tile != 'P' && tile != 'N' && tile != 'B' && tile != 'F' && tile != 'E' && tile != 'K' && tile != 'X' && tile != 'D' && tile != 'L' && tile != 'H')
+            else if (char.IsUpper(tile) && tile >= 'A' && tile <= 'Z' && tile != 'P' && tile != 'N' && tile != 'B' && tile != 'F' && tile != 'E' && tile != 'K' && tile != 'R' && tile != 'U' && tile != 'X' && tile != 'D' && tile != 'L' && tile != 'H')
             {
                 prefabToSpawn = doorPrefab;
                 isLinkedDoor = true;

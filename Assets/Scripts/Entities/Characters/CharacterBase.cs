@@ -428,9 +428,147 @@ namespace RunToExit.Core
             CheckFall();
         }
 
-        protected bool IsSolidPlatform(Collider2D hit)
+        public virtual bool IsSolidPlatform(Collider2D hit)
         {
-            return hit != null && (hit.CompareTag(TagName.Wall) || hit.GetComponent<MovableBox>() != null);
+            if (hit == null) return false;
+            return hit.CompareTag(TagName.Wall) || hit.GetComponent<MovableBox>() != null;
+        }
+
+        public virtual bool TryAutoClimb(int dirY)
+        {
+            if (GridManager.Instance.GetNode(GridPosition).GetEntity<Ladder>() == null &&
+                GridManager.Instance.GetNode(GridPosition + Vector2Int.up).GetEntity<Ladder>() == null)
+            {
+                // 足元にも頭上にもハシゴがなければ登れない
+                return false;
+            }
+
+            StartCoroutine(AutoClimbRoutine(dirY));
+            return true;
+        }
+
+        protected IEnumerator AutoClimbRoutine(int dirY)
+        {
+            State = CharacterState.ClimbingLadder;
+            Vector2Int currentPos = GridPosition;
+
+            while (true)
+            {
+                Vector2Int nextPos = currentPos + new Vector2Int(0, dirY);
+                GridNode nextNode = GridManager.Instance.GetNode(nextPos);
+                GridNode nextHeadNode = GridManager.Instance.GetNode(nextPos + Vector2Int.up);
+
+                // 上下どちらかに進む際、その先が完全にハシゴ外か、壁なら終了
+                if (dirY > 0 && nextNode.GetEntity<Ladder>() == null && nextHeadNode.GetEntity<Ladder>() == null && nextNode.IsSolid(this))
+                    break;
+                if (dirY < 0 && currentPos.y > 0 && GridManager.Instance.GetNode(currentPos + Vector2Int.down).GetEntity<Ladder>() == null && nextNode.IsSolid(this))
+                    break;
+
+                // 頭上か足元のどちらかにハシゴがあれば進める（上端で頭上が空でも登れるように）
+                bool canClimb = false;
+                if (dirY > 0 && (nextNode.GetEntity<Ladder>() != null || nextHeadNode.GetEntity<Ladder>() != null || !nextNode.IsSolid(this)))
+                    canClimb = true;
+                if (dirY < 0 && (nextNode.GetEntity<Ladder>() != null || GridManager.Instance.GetNode(currentPos).GetEntity<Ladder>() != null))
+                    canClimb = true;
+
+                if (!canClimb || nextNode.IsSolid(this))
+                {
+                    break;
+                }
+
+                Vector3 targetVisualPos = new Vector3(nextPos.x, nextPos.y + visualYOffset, 0);
+                while (Vector3.Distance(transform.position, targetVisualPos) > 0.01f)
+                {
+                    transform.position = Vector3.MoveTowards(transform.position, targetVisualPos, MoveSpeed * Time.deltaTime);
+                    yield return null;
+                }
+                transform.position = targetVisualPos;
+                currentPos = nextPos;
+            }
+
+            GridPosition = currentPos;
+            State = CharacterState.Idle;
+            CheckFall();
+        }
+
+        public virtual bool TryAutoStairs(int dirX)
+        {
+            Stairs currentStairs = GridManager.Instance.GetNode(GridPosition).GetEntity<Stairs>();
+            if (currentStairs != null)
+            {
+                StartCoroutine(AutoStairsRoutine(dirX));
+                return true;
+            }
+
+            Vector2Int nextPos = GridPosition + new Vector2Int(dirX, 0);
+            Stairs nextStairs = GridManager.Instance.GetNode(nextPos).GetEntity<Stairs>();
+            if (nextStairs != null)
+            {
+                StartCoroutine(AutoStairsRoutine(dirX));
+                return true;
+            }
+
+            return false;
+        }
+
+        protected IEnumerator AutoStairsRoutine(int dirX)
+        {
+            State = CharacterState.WalkingStairs;
+            Vector2Int currentPos = GridPosition;
+            FacingDirection = dirX;
+
+            while (true)
+            {
+                Stairs stairs = GridManager.Instance.GetNode(currentPos).GetEntity<Stairs>();
+                
+                // 次のマスを探す
+                Vector2Int nextPos = currentPos;
+
+                if (stairs != null)
+                {
+                    if (stairs.Direction == StairDirection.RightUp) // '/' 階段 (左下から右上)
+                    {
+                        nextPos = currentPos + new Vector2Int(dirX, dirX > 0 ? 1 : -1);
+                    }
+                    else // '\' 階段 (左上から右下)
+                    {
+                        nextPos = currentPos + new Vector2Int(dirX, dirX > 0 ? -1 : 1);
+                    }
+                }
+                else
+                {
+                    // 階段が終わった場合、水平移動を試みる
+                    nextPos = currentPos + new Vector2Int(dirX, 0);
+                }
+
+                if (GridManager.Instance.GetNode(nextPos).IsSolid(this))
+                {
+                    break;
+                }
+
+                Vector3 targetVisualPos = new Vector3(nextPos.x, nextPos.y + visualYOffset, 0);
+                while (Vector3.Distance(transform.position, targetVisualPos) > 0.01f)
+                {
+                    transform.position = Vector3.MoveTowards(transform.position, targetVisualPos, MoveSpeed * Time.deltaTime);
+                    yield return null;
+                }
+                transform.position = targetVisualPos;
+                currentPos = nextPos;
+
+                // 移動先が階段でなければ終了
+                if (GridManager.Instance.GetNode(currentPos).GetEntity<Stairs>() == null)
+                {
+                    // さらにその足元が階段かどうかチェック
+                    if (GridManager.Instance.GetNode(currentPos + Vector2Int.down).GetEntity<Stairs>() == null)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            GridPosition = currentPos;
+            State = CharacterState.Idle;
+            CheckFall();
         }
 
         public void PickUpItem(ItemBase item)

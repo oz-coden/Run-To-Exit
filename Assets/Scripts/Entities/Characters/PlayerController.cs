@@ -81,8 +81,13 @@ namespace RunToExit.Core
             if (Mathf.Abs(inputVector.x) > 0.1f)
             {
                 int dirX = inputVector.x > 0 ? 1 : -1;
-                Vector2Int targetPos = GridPosition + new Vector2Int(dirX, 0);
+                FacingDirection = dirX;
                 
+                // 階段の自動移動チェック
+                if (TryAutoStairs(dirX)) return;
+
+                Vector2Int targetPos = GridPosition + new Vector2Int(dirX, 0);
+
                 if (CanMoveTo(targetPos, out MovableBox box, out NPCController npcHit, out InteractableBase interactable))
                 {
                     // 移動先にアイテム等があれば拾う/触れる
@@ -90,8 +95,15 @@ namespace RunToExit.Core
                     {
                         interactable.OnInteract(this);
                     }
-                    // 移動先に床がない（穴）の場合、スプリント中なら幅跳び判定
+                    
+                    // スプリント中で穴があるならジャンプ
                     if (isSprinting && IsGap(targetPos))
+                    {
+                        if (TryLongJump(dirX)) return;
+                    }
+                    
+                    // ジャンプボタン（Sprint等の代替）が押されている場合もジャンプ
+                    if (isSprinting && !IsGap(targetPos))
                     {
                         if (TryLongJump(dirX)) return;
                     }
@@ -102,7 +114,7 @@ namespace RunToExit.Core
                 {
                     npcHit.Rescue();
                 }
-                else if (box == null && npcHit == null) // 箱でもNPCでも塞がれているわけではない（壁である）場合
+                else if (box == null && npcHit == null)
                 {
                     if (!TryStepUp(targetPos))
                     {
@@ -110,8 +122,12 @@ namespace RunToExit.Core
                     }
                 }
             }
-            // 上下はフェーズ2での「はしご昇降」「ジャンプ」等のため一旦保留
-            // else if (Mathf.Abs(inputVector.y) > 0.1f) { ... }
+            // 上下入力でハシゴ昇降
+            else if (Mathf.Abs(inputVector.y) > 0.1f)
+            {
+                int dirY = inputVector.y > 0 ? 1 : -1;
+                TryAutoClimb(dirY);
+            }
         }
 
         private bool IsGap(Vector2Int targetPos)

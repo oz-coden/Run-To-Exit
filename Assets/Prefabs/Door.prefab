@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 8211452186278655189}
   m_Layer: 0
   m_Name: Door
-  m_TagString: Wall
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -151,3 +151,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b38f7dc67e727cd45b4ac2e5d7acb7b5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RunToExit.Core.Door
+  Type: 0
