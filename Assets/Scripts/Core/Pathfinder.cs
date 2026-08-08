@@ -101,7 +101,7 @@ namespace RunToExit.Core
                         // 落下制限（無限ループ防止）
                         if (fallDepth > 50) break;
                     }
-                    if (fallDepth <= 50 && Mathf.Abs(checkFallPos.x - startPos.x) < 100) 
+                    if (fallDepth <= 50 && Mathf.Abs(checkFallPos.x - character.GridPosition.x) < 100) 
                     {
                         neighbors.Add(new PathNode(checkFallPos));
                     }
