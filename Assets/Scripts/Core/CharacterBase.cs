@@ -121,6 +121,7 @@ namespace RunToExit.Core
                 boxToPush.PushTo(boxTarget);
             }
 
+            int dirX = targetPos.x > GridPosition.x ? 1 : (targetPos.x < GridPosition.x ? -1 : 0);
             if (dirX != 0) FacingDirection = dirX;
 
             Vector3 endPos = new Vector3(targetPos.x, targetPos.y + visualYOffset, 0);

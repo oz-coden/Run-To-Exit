@@ -58,7 +58,7 @@ namespace RunToExit.Core
         {
             if (State != CharacterState.Idle) return;
 
-            if (useAction.wasPressedThisFrame && HeldItem != null)
+            if (useAction.WasPressedThisFrame() && HeldItem != null)
             {
                 // 向いている方向のマスを確認してアイテムを使う
                 Vector2Int targetPos = GridPosition + new Vector2Int(FacingDirection, 0);
