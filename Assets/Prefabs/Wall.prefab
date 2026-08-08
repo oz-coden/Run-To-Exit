@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 994718546344399063}
   - component: {fileID: 4348279134297840912}
   - component: {fileID: -8594480214390648650}
-  - component: {fileID: 5102612630122572776}
   m_Layer: 0
   m_Name: Wall
   m_TagString: Wall
@@ -139,17 +138,3 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &5102612630122572776
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8999537849147829984}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe5cb9bc2a1003043bdc25ff42c60a4e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RunToExit.Core.MovableBox
-  RequiredPower: 1
-  MoveSpeed: 5

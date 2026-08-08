@@ -30,8 +30,12 @@ namespace RunToExit.Core
             startNode.HCost = GetDistance(startPos, targetPos);
             openList.Add(startNode);
 
-            while (openList.Count > 0)
+            int maxIterations = 2000;
+            int currentIteration = 0;
+
+            while (openList.Count > 0 && currentIteration < maxIterations)
             {
+                currentIteration++;
                 PathNode currentNode = openList[0];
                 for (int i = 1; i < openList.Count; i++)
                 {
@@ -89,13 +93,18 @@ namespace RunToExit.Core
                 {
                     // 落下するかチェック
                     Vector2Int checkFallPos = nextPos;
+                    int fallDepth = 0;
                     while (GridManager.Instance.GetObjectAt(checkFallPos + Vector2Int.down) == null)
                     {
                         checkFallPos += Vector2Int.down;
+                        fallDepth++;
                         // 落下制限（無限ループ防止）
-                        if (checkFallPos.y < -50) break;
+                        if (fallDepth > 50) break;
                     }
-                    neighbors.Add(new PathNode(checkFallPos));
+                    if (fallDepth <= 50 && Mathf.Abs(checkFallPos.x - startPos.x) < 100) 
+                    {
+                        neighbors.Add(new PathNode(checkFallPos));
+                    }
                 }
                 // 2. 段差ジャンプ（上へ1マス）
                 else if (hitFoot != null && (hitFoot.CompareTag(TagName.Wall) || hitFoot.GetComponent<MovableBox>() != null))

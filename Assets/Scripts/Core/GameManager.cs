@@ -20,14 +20,17 @@ namespace RunToExit.Core
 
             var exitDoor = FindObjectOfType<ExitDoor>();
             if (exitDoor == null) return;
+            
+            var exitCol = exitDoor.GetComponent<Collider2D>();
+            if (exitCol == null) return;
 
             var player = FindObjectOfType<PlayerController>();
-            if (player == null || player.GridPosition != exitDoor.GridPosition) return;
+            if (player == null || !exitCol.OverlapPoint(player.transform.position)) return;
 
             var npcs = FindObjectsOfType<NPCController>();
             foreach (var npc in npcs)
             {
-                if (npc.GridPosition != exitDoor.GridPosition)
+                if (!exitCol.OverlapPoint(npc.transform.position))
                 {
                     Debug.Log($"Waiting for {npc.gameObject.name} to reach the exit.");
                     return;

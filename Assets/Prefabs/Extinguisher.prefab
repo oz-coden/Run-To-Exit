@@ -11,9 +11,9 @@ GameObject:
   - component: {fileID: 994718546344399063}
   - component: {fileID: 4348279134297840912}
   - component: {fileID: 3516496012725565750}
-  - component: {fileID: 5102612630122572776}
+  - component: {fileID: -3536497863869913650}
   m_Layer: 0
-  m_Name: MovableBox
+  m_Name: Extinguisher
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -84,7 +84,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
-  m_Color: {r: 1, g: 0.49803922, b: 0, a: 1}
+  m_Color: {r: 0, g: 0, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -139,7 +139,7 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &5102612630122572776
+--- !u!114 &-3536497863869913650
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -148,8 +148,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 8999537849147829984}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe5cb9bc2a1003043bdc25ff42c60a4e, type: 3}
+  m_Script: {fileID: 11500000, guid: c214228f1e352ca48ac0e518e8f60278, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RunToExit.Core.MovableBox
-  RequiredPower: 1
-  MoveSpeed: 5
+  m_EditorClassIdentifier: Assembly-CSharp::RunToExit.Core.ItemBase
+  itemType: 0

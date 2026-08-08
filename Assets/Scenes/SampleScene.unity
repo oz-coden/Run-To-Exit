@@ -181,6 +181,12 @@ MonoBehaviour:
   wallPrefab: {fileID: 8999537849147829984, guid: c47928fb81d5d3240801fd106bf49ca8, type: 3}
   playerPrefab: {fileID: 3117642145131702409, guid: aa47e472fc7484944bf312f70bf312db, type: 3}
   boxPrefab: {fileID: 8999537849147829984, guid: 2279058bced2dae40a9bc1078d44ba1c, type: 3}
+  npcPrefab: {fileID: 3117642145131702409, guid: c57b26d167d803e438a81a0636106321, type: 3}
+  firePrefab: {fileID: 8999537849147829984, guid: 5c9deeccc7867834bb9c274f738aa116, type: 3}
+  extinguisherPrefab: {fileID: 8999537849147829984, guid: 19435be5210066b41abb2ab0e5e5535b, type: 3}
+  switchPrefab: {fileID: 8999537849147829984, guid: a7a3dd4aaed8b95488446141208350d6, type: 3}
+  doorPrefab: {fileID: 8999537849147829984, guid: ad39bbc67355c4d4e8b1caa8901dddc6, type: 3}
+  exitPrefab: {fileID: 8999537849147829984, guid: c63d518dc5a12514aafa4f518b762919, type: 3}
   startPosition: {x: 0, y: 0}
 --- !u!114 &104049116
 MonoBehaviour:

@@ -81,32 +81,40 @@ namespace RunToExit.Core
             }
 
             // 他の障害物（NPCなど）が居る場合も進めない
+            bool footIsObstacle = false;
+            bool headIsObstacle = false;
+
             if (hitFoot != null)
             {
                 npcHit = hitFoot.GetComponent<NPCController>();
-                interactable = hitFoot.GetComponent<InteractableBase>();
-                if (interactable != null && interactable.IsObstacle(this)) return false;
+                var footInteractable = hitFoot.GetComponent<InteractableBase>();
+                if (footInteractable != null)
+                {
+                    if (footInteractable.IsObstacle(this)) footIsObstacle = true;
+                    else interactable = footInteractable;
+                }
+                else
+                {
+                    footIsObstacle = true; // 壁など
+                }
             }
             
             if (hitHead != null)
             {
                 if (npcHit == null) npcHit = hitHead.GetComponent<NPCController>();
-                if (interactable == null) interactable = hitHead.GetComponent<InteractableBase>();
-                if (interactable != null && interactable.IsObstacle(this)) return false;
-            }
-
-            if (hitFoot != null || hitHead != null)
-            {
-                // インタラクタブル（通過可能なアイテム等）であれば移動をブロックしない
-                if (interactable != null && !interactable.IsObstacle(this))
+                var headInteractable = hitHead.GetComponent<InteractableBase>();
+                if (headInteractable != null)
                 {
-                    // OK
+                    if (headInteractable.IsObstacle(this)) headIsObstacle = true;
+                    else if (interactable == null) interactable = headInteractable;
                 }
                 else
                 {
-                    return false;
+                    headIsObstacle = true; // 壁など
                 }
             }
+
+            if (footIsObstacle || headIsObstacle) return false;
 
             return true;
         }
