@@ -43,17 +43,30 @@ namespace RunToExit.Core
 
         public void AddEntity(IGridEntity entity)
         {
-            GetNode(entity.GridPosition).Entities.Add(entity);
+            if (entity == null) return;
+            var node = GetNode(entity.GridPosition);
+            if (!node.Entities.Contains(entity))
+            {
+                node.Entities.Add(entity);
+            }
         }
 
         public void RemoveEntity(IGridEntity entity)
         {
-            GetNode(entity.GridPosition).Entities.Remove(entity);
+            if (entity == null) return;
+            if (gridData.TryGetValue(entity.GridPosition, out GridNode node))
+            {
+                node.Entities.Remove(entity);
+            }
         }
 
         public void MoveEntity(IGridEntity entity, Vector2Int oldPos, Vector2Int newPos)
         {
-            GetNode(oldPos).Entities.Remove(entity);
+            if (entity == null) return;
+            if (gridData.TryGetValue(oldPos, out GridNode oldNode))
+            {
+                oldNode.Entities.Remove(entity);
+            }
             GetNode(newPos).Entities.Add(entity);
         }
 

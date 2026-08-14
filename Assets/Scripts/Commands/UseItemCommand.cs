@@ -14,6 +14,8 @@ namespace RunToExit.Core
 
         public IEnumerator ExecuteCoroutine(CharacterBase character)
         {
+            if (targetInteractable == null) yield break;
+
             // インタラクト対象の隣接マスまで移動する
             Vector2Int targetPos = targetInteractable.GridPosition;
             Vector2Int adjacentPos = targetPos + new Vector2Int(targetPos.x > character.GridPosition.x ? -1 : 1, 0);
@@ -24,6 +26,8 @@ namespace RunToExit.Core
                 ICommand moveCmd = new MoveCommand(adjacentPos);
                 yield return character.StartCoroutine(moveCmd.ExecuteCoroutine(character));
             }
+
+            if (targetInteractable == null) yield break;
 
             // 移動が完了したら対象の方向を向く
             int dirX = targetPos.x > character.GridPosition.x ? 1 : -1;

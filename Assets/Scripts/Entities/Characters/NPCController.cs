@@ -10,16 +10,34 @@ namespace RunToExit.Core
         private Coroutine currentCommandCoroutine;
 
         public bool IsRescued { get; private set; } = false;
+        public bool IsEscaped { get; private set; } = false;
 
         public void Rescue()
         {
             IsRescued = true;
-            CommandManager.Instance.SelectNPC(this);
+            if (CommandManager.Instance != null)
+            {
+                CommandManager.Instance.SelectNPC(this);
+            }
             Debug.Log($"{gameObject.name} was rescued!");
+        }
+
+        public void Escape()
+        {
+            if (IsEscaped) return;
+            IsEscaped = true;
+            ClearCommands();
+            if (GridManager.Instance != null)
+            {
+                GridManager.Instance.RemoveEntity(this);
+            }
+            Debug.Log($"{gameObject.name} escaped successfully!");
+            gameObject.SetActive(false);
         }
 
         public void AddCommand(ICommand command)
         {
+            if (IsEscaped) return;
             commandQueue.Enqueue(command);
             if (currentCommandCoroutine == null && State == CharacterState.Idle)
             {
@@ -40,6 +58,8 @@ namespace RunToExit.Core
 
         private void ProcessNextCommand()
         {
+            if (IsEscaped) return;
+
             if (commandQueue.Count > 0)
             {
                 ICommand cmd = commandQueue.Dequeue();
@@ -53,8 +73,19 @@ namespace RunToExit.Core
 
         private IEnumerator ExecuteCommandRoutine(ICommand command)
         {
-            yield return StartCoroutine(command.ExecuteCoroutine(this));
-            ProcessNextCommand(); // 次のコマンドへ
+            try
+            {
+                yield return StartCoroutine(command.ExecuteCoroutine(this));
+            }
+            finally
+            {
+                if (State != CharacterState.Falling)
+                {
+                    State = CharacterState.Idle;
+                }
+                currentCommandCoroutine = null;
+                ProcessNextCommand(); // 次のコマンドへ
+            }
         }
 
         public override void CheckFall()

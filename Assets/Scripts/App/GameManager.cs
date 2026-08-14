@@ -25,20 +25,27 @@ namespace RunToExit.Core
             if (exitCol == null) return;
 
             var player = FindObjectOfType<PlayerController>();
-            if (player == null || !exitCol.OverlapPoint(player.transform.position)) return;
 
+            // プレイヤーが非常口に到達していない場合はクリア不可
+            if (player == null || !exitCol.OverlapPoint(player.transform.position))
+            {
+                return;
+            }
+
+            // マップ上の全NPCを確認（未脱出かつ未救出のNPCがいるか、未脱出のNPCが非常口にいない場合）
             var npcs = FindObjectsOfType<NPCController>();
             foreach (var npc in npcs)
             {
-                if (!exitCol.OverlapPoint(npc.transform.position))
+                if (!npc.IsEscaped)
                 {
-                    Debug.Log($"Waiting for {npc.gameObject.name} to reach the exit.");
+                    // まだ脱出していないNPCがいる場合はクリア保留
+                    Debug.Log($"Waiting for {npc.gameObject.name} to escape.");
                     return;
                 }
             }
 
             isCleared = true;
-            Debug.Log("STAGE CLEAR! All characters reached the exit.");
+            Debug.Log("STAGE CLEAR! All characters reached the exit!");
             // UI表示や次ステージへの遷移処理をここに追加
         }
     }

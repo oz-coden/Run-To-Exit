@@ -609,16 +609,25 @@ namespace RunToExit.Core
 
         public void UseItemOn(InteractableBase target)
         {
-            if (HeldItem == null) return;
+            if (target == null) return;
 
             if (HeldItem == ItemType.Extinguisher && target is FireHazard fire)
             {
                 fire.Extinguish();
-                // 使い捨てとする場合
-                HeldItem = null;
-                if (heldItemVisual != null) heldItemVisual.SetActive(false);
+                ConsumeItem();
             }
-            // 他のアイテム使用ロジックもここに追加
+            else if (target is Door door)
+            {
+                door.OnInteract(this);
+            }
+            else if (target is RopeAnchor anchor)
+            {
+                anchor.OnInteract(this);
+            }
+            else
+            {
+                target.OnInteract(this);
+            }
         }
     }
 }

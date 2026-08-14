@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace RunToExit.Core
 {
-    public class MovableBox : MonoBehaviour
+    public class MovableBox : MonoBehaviour, IGridEntity
     {
         public int RequiredPower = 1; // 1: 通常箱(青年も押せる), 2: 重い箱(大人のみ)
         public float MoveSpeed = 5f;
@@ -11,12 +11,37 @@ namespace RunToExit.Core
 
         public Vector2Int GridPosition => new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.y));
 
+        public bool IsSolidTo(CharacterBase character) => true;
+        public bool IsInteractable => false;
+        public void OnInteract(CharacterBase character) {}
+
+        private void Start()
+        {
+            if (GridManager.Instance != null)
+            {
+                GridManager.Instance.AddEntity(this);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (GridManager.Instance != null)
+            {
+                GridManager.Instance.RemoveEntity(this);
+            }
+        }
+
         public bool CanMoveTo(Vector2Int targetPos)
         {
+            GridNode node = GridManager.Instance.GetNode(targetPos);
+            if (node.IsWall) return false;
+            foreach (var entity in node.Entities)
+            {
+                if (entity != this && entity.IsSolidTo(null)) return false;
+            }
             Collider2D hit = GridManager.Instance.GetObjectAt(targetPos);
             if (hit != null && hit.gameObject != this.gameObject)
             {
-                // 壁や他の箱など何かがあれば進めない
                 return false;
             }
             return true;
@@ -33,6 +58,7 @@ namespace RunToExit.Core
         private IEnumerator MoveRoutine(Vector2Int targetPos)
         {
             isMoving = true;
+            Vector2Int oldPos = GridPosition;
             Vector3 endPos = new Vector3(targetPos.x, targetPos.y, 0);
             
             while (Vector3.Distance(transform.position, endPos) > 0.01f)
@@ -41,6 +67,10 @@ namespace RunToExit.Core
                 yield return null;
             }
             transform.position = endPos;
+            if (GridManager.Instance != null)
+            {
+                GridManager.Instance.MoveEntity(this, oldPos, targetPos);
+            }
             isMoving = false;
 
             CheckFall();
@@ -49,8 +79,8 @@ namespace RunToExit.Core
         private void CheckFall()
         {
             Vector2Int below = GridPosition + Vector2Int.down;
-            Collider2D hit = GridManager.Instance.GetObjectAt(below);
-            if (hit == null || hit.gameObject == gameObject)
+            GridNode node = GridManager.Instance.GetNode(below);
+            if (!node.IsSolid(null))
             {
                 StartCoroutine(FallRoutine());
             }
@@ -61,10 +91,11 @@ namespace RunToExit.Core
             isMoving = true;
             while (true)
             {
+                Vector2Int oldPos = GridPosition;
                 Vector2Int below = GridPosition + Vector2Int.down;
-                Collider2D hit = GridManager.Instance.GetObjectAt(below);
+                GridNode node = GridManager.Instance.GetNode(below);
                 
-                if (hit != null && hit.gameObject != gameObject)
+                if (node.IsSolid(null))
                 {
                     break;
                 }
@@ -76,6 +107,10 @@ namespace RunToExit.Core
                     yield return null;
                 }
                 transform.position = endPos;
+                if (GridManager.Instance != null)
+                {
+                    GridManager.Instance.MoveEntity(this, oldPos, below);
+                }
             }
             isMoving = false;
         }

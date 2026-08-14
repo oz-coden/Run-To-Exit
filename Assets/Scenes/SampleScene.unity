@@ -187,6 +187,11 @@ MonoBehaviour:
   switchPrefab: {fileID: 8999537849147829984, guid: a7a3dd4aaed8b95488446141208350d6, type: 3}
   doorPrefab: {fileID: 8999537849147829984, guid: ad39bbc67355c4d4e8b1caa8901dddc6, type: 3}
   exitPrefab: {fileID: 8999537849147829984, guid: c63d518dc5a12514aafa4f518b762919, type: 3}
+  keyPrefab: {fileID: 8999537849147829984, guid: f238e2a7a027b734a99fe70961ec67dd, type: 3}
+  ladderPrefab: {fileID: 8999537849147829984, guid: 9ab551e781980274384bcebc20d3d728, type: 3}
+  stairsPrefab: {fileID: 8999537849147829984, guid: 78fa978c19bbf6b44a3e3d6120aaeebc, type: 3}
+  ropePrefab: {fileID: 0}
+  ropeAnchorPrefab: {fileID: 0}
   startPosition: {x: 0, y: 0}
 --- !u!114 &104049116
 MonoBehaviour:
@@ -212,6 +217,7 @@ GameObject:
   - component: {fileID: 519420031}
   - component: {fileID: 519420029}
   - component: {fileID: 519420030}
+  - component: {fileID: 519420033}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -337,6 +343,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &519420033
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 519420028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9868115ef120e4742944c1e051cae04b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::RunToExit.Core.CameraController
+  playerTransform: {fileID: 0}
+  followSpeed: 5
+  maxPanDistance: 10
+  edgeThreshold: 0.2
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0

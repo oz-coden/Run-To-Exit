@@ -47,15 +47,15 @@ namespace RunToExit.Core
         public void OpenDoor()
         {
             IsOpen = true;
-            GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 0.3f); // 半透明にするなど（仮）
-            GetComponent<Collider2D>().enabled = false; // 通過可能にする
+            if (TryGetComponent<SpriteRenderer>(out var sr)) sr.color = new Color(1, 1, 1, 0.3f);
+            if (TryGetComponent<Collider2D>(out var col)) col.enabled = false;
         }
 
         public void CloseDoor()
         {
             IsOpen = false;
-            GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 1f); // 元に戻す
-            GetComponent<Collider2D>().enabled = true; // 障害物にする
+            if (TryGetComponent<SpriteRenderer>(out var sr)) sr.color = new Color(1, 1, 1, 1f);
+            if (TryGetComponent<Collider2D>(out var col)) col.enabled = true;
         }
     }
 }

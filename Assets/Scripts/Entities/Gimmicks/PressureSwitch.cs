@@ -42,7 +42,7 @@ namespace RunToExit.Core
             {
                 IsOn = true;
                 Debug.Log($"{gameObject.name} Activated");
-                GetComponent<SpriteRenderer>().color = Color.green; // 仮の見た目変化
+                if (TryGetComponent<SpriteRenderer>(out var sr)) sr.color = Color.green;
                 OnActivated?.Invoke();
 
                 if (targetDoor != null && targetDoor.Type == DoorType.Switch)
@@ -54,7 +54,7 @@ namespace RunToExit.Core
             {
                 IsOn = false;
                 Debug.Log($"{gameObject.name} Deactivated");
-                GetComponent<SpriteRenderer>().color = Color.red; // 仮の見た目変化
+                if (TryGetComponent<SpriteRenderer>(out var sr)) sr.color = Color.red;
                 OnDeactivated?.Invoke();
 
                 if (targetDoor != null && targetDoor.Type == DoorType.Switch)

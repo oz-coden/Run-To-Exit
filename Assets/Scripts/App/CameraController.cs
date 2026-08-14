@@ -14,12 +14,24 @@ namespace RunToExit.Core
 
         private void Start()
         {
-            cam = Camera.main;
+            cam = Camera.main != null ? Camera.main : GetComponent<Camera>();
+            if (playerTransform == null)
+            {
+                var player = FindObjectOfType<PlayerController>();
+                if (player != null) playerTransform = player.transform;
+            }
         }
 
         private void LateUpdate()
         {
-            if (playerTransform == null || cam == null) return;
+            if (cam == null) cam = Camera.main;
+            if (playerTransform == null)
+            {
+                var player = FindObjectOfType<PlayerController>();
+                if (player != null) playerTransform = player.transform;
+                else return;
+            }
+            if (cam == null) return;
 
             Vector3 targetPos = playerTransform.position;
             targetPos.z = transform.position.z;

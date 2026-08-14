@@ -8,9 +8,11 @@ namespace RunToExit.Core
 
         public override void OnInteract(CharacterBase character)
         {
-            // 自動で拾うような処理はしない。
-            // 到達判定はGameManager側で Update などを回して判定するか、ここで判定を呼ぶ
-            if (character is PlayerController)
+            if (character is NPCController npc && npc.IsRescued && !npc.IsEscaped)
+            {
+                npc.Escape();
+            }
+            if (GameManager.Instance != null)
             {
                 GameManager.Instance.CheckClearCondition();
             }
