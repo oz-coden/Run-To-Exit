@@ -1,0 +1,28 @@
+name: Validate and deploy
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: run-to-exit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test -- --passWithNoTests
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: dist

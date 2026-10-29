@@ -1,0 +1,7 @@
+{
+ "repository": "https://github.com/oz-coden/Simpludify",
+ "commit": "152ec2e35789ec512f53ea988d7f0d54d7ff1ead",
+ "source": "main",
+ "method": "Official npm run create scaffold; retained unmodified packages/core and packages/web sources and MIT license. Game tooling is maintained separately.",
+ "updates": "Explicitly review a new commit, replace these sources, update this record and package-lock.json, then run npm run verify. No network fetch occurs during builds."
+}
