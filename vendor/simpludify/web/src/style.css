@@ -1,0 +1,153 @@
+.simpludify {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  min-height: 20rem;
+  overflow: hidden;
+  background: var(--s-background);
+  color: var(--s-text);
+  font-family: var(--s-font);
+  outline-offset: -4px;
+}
+.simpludify,
+.simpludify * {
+  box-sizing: border-box;
+}
+.simpludify > canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.s-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-flow: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  overflow: auto;
+  pointer-events: none;
+}
+.s-ui > * {
+  pointer-events: auto;
+}
+.s-panel {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem;
+  max-width: min(100%, 30rem);
+  min-width: 0;
+  background: var(--s-surface);
+  border: 1px solid color-mix(in srgb, var(--s-muted), transparent 65%);
+  border-radius: 1rem;
+  box-shadow: 0 0.5rem 2rem #0002;
+}
+.s-column {
+  flex-direction: column;
+}
+.s-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.s-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  width: 100%;
+}
+.s-ui p,
+.s-ui h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.s-ui h2 {
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+.s-muted {
+  color: var(--s-muted);
+  font-size: 0.9rem;
+}
+.s-ui button {
+  font: inherit;
+  font-weight: 650;
+  color: var(--s-background);
+  background: var(--s-accent);
+  border: 0;
+  border-radius: 0.6rem;
+  padding: 0.7rem 1rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.s-ui button:hover {
+  filter: brightness(1.08);
+}
+.s-ui button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+.s-ui button:focus-visible,
+.simpludify:focus-visible {
+  outline: 3px solid var(--s-accent);
+  outline-offset: 3px;
+}
+.s-error {
+  position: absolute;
+  bottom: 1rem;
+  inset-inline: 1rem;
+  z-index: 2;
+  padding: 1rem;
+  background: #6b1728;
+  color: #fff;
+  border-radius: 0.75rem;
+}
+@media (max-width: 32rem) {
+  .s-ui {
+    padding: 0.75rem;
+  }
+  .s-panel {
+    padding: 0.85rem;
+  }
+}
+
+.s-ui > .s-bottom {
+  margin-top: auto;
+}
+.s-ui > .s-center {
+  margin: auto;
+}
+.simpludify .s-hold {
+  min-width: 3rem;
+  min-height: 3rem;
+  touch-action: none;
+  user-select: none;
+}
+.simpludify .s-hold[aria-pressed="true"] {
+  filter: brightness(0.8);
+}
+
+/* Semantic keyboard/AT mirrors; all visible rendering and pointer hits use Pixi. */
+.s-canvas-accessibility {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.s-canvas-accessibility button {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+.simpludify > canvas {
+  touch-action: none;
+}

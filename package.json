@@ -1,0 +1,33 @@
+{
+  "name": "run-to-exit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "vendor/simpludify/core",
+    "vendor/simpludify/web"
+  ],
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build --base /Run-To-Exit/ && node scripts/notices.mjs",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "test:e2e": "playwright test",
+    "verify": "npm run check && npm test && npm run build && npm run test:e2e"
+  },
+  "dependencies": {
+    "@simpludify/core": "0.1.0",
+    "@simpludify/web": "0.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.10.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}
