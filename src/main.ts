@@ -27,6 +27,7 @@ root.innerHTML = `
       <div class="panel-heading"><h2><span class="eyebrow">BUILDING MAP</span>脱出フロア</h2><span class="pill" id="status" role="status">計画中</span></div>
       <div id="board" aria-label="脱出フロア。Aは(2,3)、Bは(2,5)。スイッチS1は(2,2)、S2は(2,6)、扉は(5,3)、出口は(8,3)。中央の壁は扉だけ通れます。"></div>
       <div class="legend"><span><i class="legend-a"></i>A アオ</span><span><i class="legend-b"></i>B ベニ</span><span><i class="legend-switch"></i>S1 / S2</span><span><i class="legend-exit"></i>出口</span><span id="gate-status">ゲート：閉鎖</span></div>
+      <a class="mobile-jump" href="#plan-title">命令を編集する ↓</a>
       <div class="transport"><button id="play" class="primary" disabled>▶ 再生開始</button><button id="step" disabled>1 ステップ →</button><button id="restart" title="編集中の計画を初期状態から実行">↻ 再実行</button><label class="speed-label">速度<select id="speed" aria-label="再生速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label></div>
       <p id="run-note" class="note">人物を選び、右のパネルから命令を追加しよう。</p>
       <div id="outcome" hidden tabindex="-1"></div>
@@ -34,6 +35,7 @@ root.innerHTML = `
     </section>
     <section class="editor panel" aria-labelledby="plan-title">
       <div class="panel-heading"><h2 id="plan-title"><span class="eyebrow">YOUR PROGRAM</span>行動を計画する</h2><span id="draft-badge" class="pill">編集中</span></div>
+      <a class="mobile-jump" href="#board">マップを見る ↑</a>
       <div class="character-tabs" role="group" aria-label="命令を編集する人物"><button data-person="A" aria-pressed="true"><span class="avatar a">A</span><span>アオ<small id="pos-A">(2, 3)</small></span><span class="command-count" id="count-A">0</span></button><button data-person="B" aria-pressed="false"><span class="avatar b">B</span><span>ベニ<small id="pos-B">(2, 5)</small></span><span class="command-count" id="count-B">0</span></button></div>
       <p class="selected-title"><b id="selected-name">A アオ</b> の次回実行する計画 <span id="selected-cell">対象 (8, 3)</span></p>
       <ol id="commands" class="commands" aria-label="編集中の命令列"></ol>
@@ -441,13 +443,11 @@ for (const [id, plan] of [
     renderEditor();
     renderStatus();
   });
-document
-  .querySelectorAll<HTMLButtonElement>("[data-person]")
-  .forEach((b) =>
-    b.addEventListener("click", () => select(b.dataset.person!), {
-      signal: shutdown.signal,
-    }),
-  );
+document.querySelectorAll<HTMLButtonElement>("[data-person]").forEach((b) =>
+  b.addEventListener("click", () => select(b.dataset.person!), {
+    signal: shutdown.signal,
+  }),
+);
 const game = new Game({
   parent: $("board"),
   resolution: { width: 640, height: 448 },

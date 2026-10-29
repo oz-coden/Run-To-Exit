@@ -930,3 +930,53 @@ footer {
     padding: 16px 17px;
   }
 }
+
+.mobile-jump {
+  display: none;
+}
+@media (max-width: 780px) {
+  body {
+    padding-bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+  .mobile-jump {
+    display: block;
+    margin: 12px 18px;
+    color: var(--accent);
+    font-size: 12px;
+    line-height: 2;
+  }
+  .transport {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: 1.3fr 1.3fr 1.1fr 58px;
+    gap: 6px;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    background: #10232ff5;
+    border-top: 1px solid #55707c;
+    box-shadow: 0 -8px 25px #08141d70;
+  }
+  .transport button {
+    min-width: 0;
+    padding: 8px 4px;
+    min-height: 44px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .transport .speed-label {
+    margin: 0;
+    font-size: 0;
+    gap: 0;
+  }
+  .transport .speed-label select {
+    width: 100%;
+    min-height: 44px;
+    font-size: 11px;
+    padding: 6px;
+  }
+  #board,
+  #plan-title {
+    scroll-margin-top: 15px;
+  }
+}
