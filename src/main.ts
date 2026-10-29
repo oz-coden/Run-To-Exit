@@ -184,7 +184,7 @@ for (const [id,plan] of [['load-solution',solution],['load-conflict',collisionEx
   draft=structuredClone(plan); highlightedCommand=null; renderEditor(); renderStatus();
 });
 document.querySelectorAll<HTMLButtonElement>('[data-person]').forEach(b=>b.addEventListener('click',()=>select(b.dataset.person!),{signal:shutdown.signal}));
-const game=new Game({parent:$('board'),resolution:{width:640,height:448},tokens:{background:'#152936'},onError:error=>{playing=false; $('run-note').textContent=`ゲームの起動または描画に失敗しました：${String(error)}`;}});
+const game=new Game({parent:$('board'),resolution:{width:640,height:448},maxDelta:0.25,tokens:{background:'#152936'},onError:error=>{playing=false; $('run-note').textContent=`ゲームの起動または描画に失敗しました：${String(error)}`;}});
 game.element.setAttribute('aria-label','脱出フロア。Tabキーで人物を選択できます。');
 game.scene('puzzle',context=>{
   board=new Board(game,context,stage,initial,select,pick); board.select(selected); board.focus();

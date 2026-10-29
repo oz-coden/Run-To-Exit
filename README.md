@@ -1,11 +1,110 @@
 # Run To Exit
 
-2D rescue puzzle-action game, inspired by TAITO's EXIT.
+**命令を組み、同時に動く。ふたりで、出口へ。**
 
-This repository is being rebuilt using [Simpludify](https://github.com/oz-coden/Simpludify).
+[ブラウザで遊ぶ](https://oz-coden.github.io/Run-To-Exit/) · [実行規則](docs/rules.md) · [設計とSimpludify利用](docs/architecture.md)
 
-The previous Unity prototype is preserved in the [`legacy/unity` branch](https://github.com/oz-coden/Run-To-Exit/tree/legacy/unity).
+Run To Exit は、複数の人物の行動を事前に計画する、トップダウンの脱出パズルです。直接移動、自動経路探索、設備操作、待機を同じ命令列に組み合わせ、全員を出口へ導きます。人物の操作技術ではなく、場所とタイミングの組み立てを楽しむゲームです。
 
-## Status
+タイトー『EXIT』の救助・脱出という題材に着想を得ています。ルール、ステージ、キャラクター、図形素材は独自のものです。以前のUnity版の移植ではありません。
 
-Rebuild preparation. Game implementation has not yet started.
+## 遊び方
+
+1. **A アオ / B ベニ** を選ぶ。マップ上の人物、Canvas上の人物ボタン、命令パネルの人物タブから切り替えられます。
+2. 命令の種類・方向・マス数・座標・設備などを選び、**＋ 命令を追加**。各行の ↑ ↓ × で並べ替え・削除できます。命令を直す場合は削除して追加してください。
+3. **再生開始**で全員の計画を固定して実行。**一時停止 / 再開**、**1ステップ →**、0.5〜4倍速を利用できます。
+4. 実行中も次回の計画を編集できます。変更は現在の実行に反映されません。**↻ 再実行**で初期状態から編集済みの計画を実行します。
+5. Conflictが起きたらログと座標を確認し、計画を修正して再実行。全員が出口に到達するとクリアです。
+
+マップの空きマスを選ぶと自動移動の対象座標、スイッチを選ぶと操作対象を指定できます。座標欄からの直接指定も可能です。ログのイベントを選ぶと関連マスを強調します。命令番号を持つログでは関連する命令行も強調します。実行中の固定計画はパネル下の折りたたみで確認できます。
+
+### 命令
+
+| 命令 | 指定内容 | 所要ステップ |
+| --- | --- | --- |
+| 方向へ移動 | 上下左右、1〜50マス | 1マスにつき1 |
+| 座標まで自動移動 | X/Y座標 | 最短経路上の1マスにつき1 |
+| 設備を操作 | スイッチ | 1 |
+| ステップ数で待機 | 1〜100 | 指定数 |
+| 条件が成立するまで待機 | 扉の開閉、相手の脱出、相手の座標 | 条件成立を確認したステップまで |
+
+操作できるのは同じマスか上下左右の隣。各命令には最低1ステップかかります。自動移動は開始時の地形で探索し、閉じた扉を通る経路は作りません。人物を自動回避したり、塞がった経路で勝手に待機したりはしません。
+
+### ステップとConflict
+
+- 世界の整数ステップを全員が共有します。待機中・命令切れでも時間は進みます。描画速度で行動結果は変化しません。
+- 同じマスへの同時進入、壁や閉じた扉への侵入、操作範囲外などはConflictです。そのステップ全体を未確定のまま停止します。
+- 他人物がステップ開始時にいたマスには進めません。位置交換・追従する連鎖移動も禁止です。
+- Step S の操作による設備の効果は、最短でも Step S+1 からです。閉じる扉に人物が残る場合もConflictになります。
+- 出口に着いた人物は盤面の占有を解除します。全員脱出が目標です。
+
+## 初期ステージ「ふたつの合図」
+
+2人、2つのスイッチ、中央ゲート、出口からなる小さなオリジナルステージです。**S1 と S2 を同じステップで操作すると、翌ステップから6ステップだけゲートが開きます。** 操作は両方の人物による協力が必要です。
+
+<details>
+<summary>攻略例（9ステップ）</summary>
+
+| 人物 | 命令列 |
+| --- | --- |
+| A アオ | S1を操作 → (8,3)まで自動移動 |
+| B ベニ | S2を操作 → 右へ2マス → 上へ2マス → (8,3)まで自動移動 |
+
+Step 1で同時操作、ゲートは2〜7で開放。Aは7で脱出、Bは6でゲートを通り9で脱出します。「ヒント・攻略例」からこの計画をセットできます。衝突例はAが下、Bが上へ動き、Step 1で(2,4)への同時進入が発生します。
+
+</details>
+
+## 開発環境
+
+Node.js **22.12以上**（CIは24）、npmが必要です。
+
+```sh
+git clone https://github.com/oz-coden/Run-To-Exit.git
+cd Run-To-Exit
+npm ci
+npm run dev
+```
+
+表示されたURLの `/Run-To-Exit/` を開いてください。ブラウザはWebGL対応の最新版を想定し、自動検証対象はChromiumです。デスクトップと幅390pxのタッチ画面で検証します。iOS Safari・Firefox・実機スマートフォンは未検証です。
+
+### Simpludifyの固定と更新
+
+[Simpludify](https://github.com/oz-coden/Simpludify) のCore / Webをソースワークスペースとして利用しています。公式の `npm run create` を実行し、ゲームに必要なエンジンパッケージを `vendor/simpludify/` に収録しました。公開npm SDKへの依存ではありません。
+
+採用コミットは **`152ec2e35789ec512f53ea988d7f0d54d7ff1ead`**。元ソースを変更せず、公開パッケージのexportだけを使います。出典は [PROVENANCE.json](vendor/simpludify/PROVENANCE.json)、ライセンスは [MIT](vendor/simpludify/LICENSE)。ビルド時にSimpludifyのmainを取得しません。npm依存もlockfileで固定しています。
+
+更新は採用コミットを明示してソース差分をレビューし、vendor・出典・lockfileを更新して `npm run verify` を実行します。エンジン本体への改善候補は [API利用レビュー](docs/engine-review.md) に記録しています。
+
+## テストと本番ビルド
+
+```sh
+npm run check                 # strict TypeScript
+npm test                      # DOM不要の世界更新テスト
+npm run build                 # dist/、ベースパス /Run-To-Exit/
+npx playwright install --with-deps chromium
+npm run test:e2e              # 本番ビルドをデスクトップ・狭幅で操作
+npm run verify                # check → unit → build → E2E
+```
+
+E2Eには事前の `npm run build` が必要です。`CHROMIUM_PATH` で互換性のある既存Chromiumを指定できます。`E2E_BASE_URL` を設定すると、そのURLで同じ操作テストを実行します。省略時はローカルの本番プレビューを起動します。
+
+```sh
+npm run preview
+# http://localhost:4173/Run-To-Exit/
+```
+
+GitHub Actionsは型検査・単体テスト・本番ビルド・少数のブラウザE2Eを実施します。検証に成功したmainのみPagesへデプロイします。PagesのSourceは **GitHub Actions** を選択してください。独自ドメインがアカウントに設定されている場合、公開URLはリダイレクトされることがあります。JavaScript、CSS、SVG、ライセンス表示を含むdist全体が配信対象です。
+
+## 実装範囲と制約
+
+現在は1ステージ、2人、スイッチと期間付きゲートのプロトタイプです。描画にTilemap / Actor / Transform / Renderable、マップ操作にPointerEvent、人物選択にCanvas UI / Flex、イベント通知にSceneのEventBusを使います。長い命令列やフォームはDOMです。
+
+- 命令は人物ごとに50個まで。自動再生は200ステップで一時停止します。
+- 計画はページ内で保持します。リロードすると編集内容は消えます。
+- 箱の占有、遅延・期間付きの扉、全接続先AND / 任意OR信号は世界モデルで対応。初期ステージは箱なし・遅延なしのANDゲートです。
+- 条件分岐・ループ、巻き戻し・履歴ジャンプ、追加ステージ、音、メモ、セーブ、オンライン協力は未実装です。
+- 「協力」は複数人物の計画を組む意味で、ネットワーク対戦・協力機能ではありません。
+
+## 旧Unity版
+
+従来の救助アクションのコードと履歴は [`legacy/unity`](https://github.com/oz-coden/Run-To-Exit/tree/legacy/unity) に保存しています。新プロトタイプから旧版のデータや素材は読み込みません。
