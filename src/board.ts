@@ -12,6 +12,9 @@ import {
   SpriteSheet,
   Tilemap,
   Transform,
+  Tween,
+  Easing,
+  type TweenPlayback,
   type CanvasNode,
   type Game,
   type SceneContext,
@@ -46,11 +49,12 @@ export class Board {
   private previous: World;
   private state: World;
   private selected = "A";
-  private elapsed = 1;
-  private duration = 0.2;
+  private progress = 1;
+  private animation?: TweenPlayback;
+  private cursor: Point = { x: 8, y: 3 };
   constructor(
     game: Game,
-    context: SceneContext,
+    private readonly context: SceneContext,
     private readonly stage: Stage,
     initial: World,
     select: (id: string) => void,
@@ -60,7 +64,7 @@ export class Board {
     this.map = new Tilemap<Tile>({
       id: "building",
       sheet: tiles,
-      tiles: Grid.generate<Tile>(11, 8, (x, y) =>
+      tiles: Grid.generate<Tile>(stage.rows[0].length, stage.rows.length, (x, y) =>
         stage.rows[y][x] === "#" ? "wall" : "floor",
       ),
       tileWidth: TILE,
@@ -81,7 +85,7 @@ export class Board {
     this.hint = CanvasLabel("人物を選択 → マスをタップして目的地を指定", {
       fontSize: 12,
       color: 0xa5bdc8,
-      textWrap: false,
+      textWrap: true,
     });
     const characterButtons = stage.people.map((p) => {
       const button = CanvasButton(`${p.id} ${p.name}`, () => select(p.id), {
@@ -145,7 +149,8 @@ export class Board {
       if (!cell) return;
       const person = this.state.people.find((p) => !p.escaped && same(p, cell));
       if (person) select(person.id);
-      pick({ x: cell.x, y: cell.y });
+      this.cursor = { x: cell.x, y: cell.y };
+      pick(this.cursor);
     });
     const resize = () => {
       const width = game.element.clientWidth,
@@ -162,17 +167,45 @@ export class Board {
     observer.observe(game.element);
     context.onActivate(resize);
     context.onDispose(() => observer.disconnect());
-    context.onUpdate((seconds) => {
-      this.elapsed += seconds;
-      this.draw();
-    });
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.target !== game.element || event.altKey || event.ctrlKey || event.metaKey) return;
+      const delta: Record<string, Point> = {
+        ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 },
+        ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
+      };
+      if (delta[event.key]) {
+        event.preventDefault();
+        this.cursor = {
+          x: Math.max(0, Math.min(this.map.width - 1, this.cursor.x + delta[event.key].x)),
+          y: Math.max(0, Math.min(this.map.height - 1, this.cursor.y + delta[event.key].y)),
+        };
+        pick(this.cursor);
+      } else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        const person = this.state.people.find((p) => !p.escaped && same(p, this.cursor));
+        if (person) select(person.id);
+        pick(this.cursor);
+      }
+    };
+    game.element.addEventListener("keydown", keyboard);
+    context.onDispose(() => game.element.removeEventListener("keydown", keyboard));
     this.sync(initial, false);
   }
   sync(state: World, animate: boolean, duration = 0.24): void {
+    // Finish an interrupted display transition before replacing its immutable endpoints.
+    this.animation?.finish();
     this.previous = this.state;
     this.state = state;
-    this.duration = duration;
-    this.elapsed = animate ? 0 : duration;
+    this.progress = animate ? 0 : 1;
+    if (animate) {
+      this.animation = this.context.scene.presentationTweens.play(
+        Tween.to(Tween.bind({
+          target: this, key: "progress", owner: this.context.scene,
+          read: () => this.progress,
+          write: (value) => { this.progress = value; this.draw(); },
+        }), 1, { from: 0, duration, easing: Easing.InOutCubic }),
+      );
+    }
     for (const door of this.stage.doors)
       this.map.set(
         door.x,
@@ -215,8 +248,7 @@ export class Board {
     });
   }
   private draw(): void {
-    const t = Math.min(1, this.elapsed / this.duration),
-      alpha = t * t * (3 - 2 * t);
+    const alpha = this.progress;
     for (const p of this.state.people) {
       const old = this.previous.people.find((o) => o.id === p.id)!,
         view = this.people.get(p.id)!;

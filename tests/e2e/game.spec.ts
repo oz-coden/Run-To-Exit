@@ -150,7 +150,7 @@ test("reorders/deletes commands, validates values, and supports all waiting cont
 });
 test("Canvas pointer coordinates choose a cell and Canvas buttons choose a person", async ({
   page,
-}) => {
+}, info) => {
   await open(page);
   const surface = page.locator("#board .simpludify");
   const box = await surface.boundingBox();
@@ -162,7 +162,8 @@ test("Canvas pointer coordinates choose a cell and Canvas buttons choose a perso
   // Switch S2 at (2,6); use a real pointer/touch, not application state injection.
   const x = box.x + offsetX + (56 + 2.5 * 48) * scale,
     y = box.y + offsetY + (32 + 6.5 * 48) * scale;
-  await page.mouse.click(x, y);
+  if (info.project.name === "narrow") await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
   await expect(page.locator("#command-kind")).toHaveValue("interact");
   await expect(page.locator("#device")).toHaveValue("s2");
   // Native semantic mirror exercises Canvas keyboard activation.
@@ -190,4 +191,55 @@ test("loads and reloads the production subpath with healthy local assets", async
   await expect(page.locator("canvas")).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/Run-To-Exit/");
   expect(broken).toEqual([]);
+});
+
+
+test("keyboard map targeting stays isolated from form input and editor focus survives edits", async ({ page }) => {
+  await open(page);
+  const surface = page.locator("#board .simpludify");
+  await surface.focus();
+  await surface.press("ArrowLeft");
+  await expect(page.locator("#selected-cell")).toHaveText("対象 (7, 3)");
+  await surface.press("ArrowUp");
+  await expect(page.locator("#target-y")).toHaveValue("2");
+  await page.locator("#target-x").focus();
+  await page.locator("#target-x").press("ArrowDown");
+  await expect(page.locator("#selected-cell")).toHaveText("対象 (7, 2)");
+  await expect(page.locator("#status")).toHaveText("計画中");
+  await add(page, "wait", { "wait-count": "1" });
+  await add(page, "move", { direction: "right" });
+  await page.getByRole("button", { name: "命令 2 を上へ移動", exact: true }).press("Enter");
+  await expect(page.locator("#commands .command").first()).toContainText("右へ");
+  await expect(page.locator("#commands button:focus")).toHaveCount(1);
+  await page.getByRole("button", { name: "命令 1 を削除", exact: true }).press("Enter");
+  await expect(page.locator("#commands button:focus")).toHaveCount(1);
+  await page.getByRole("button", { name: "命令 1 を削除", exact: true }).press("Enter");
+  await expect(page.locator("#add-command")).toBeFocused();
+  await add(page, "wait", { "wait-count": "10" });
+  await page.locator("#speed").selectOption("4");
+  await page.locator("#play").click();
+  const deleteCommand = page.getByRole("button", { name: "命令 1 を削除", exact: true });
+  await deleteCommand.focus();
+  await expect(page.locator("#run-note")).toContainText(/世界 Step [2-9]。/);
+  await expect(deleteCommand).toBeFocused();
+  await page.locator("#play").click();
+});
+
+test("ships registry SDK inventory, license notices, and supports 320px command scrolling", async ({ page, request }) => {
+  await open(page);
+  const response = await request.get("dependencies.json");
+  expect(response.ok()).toBe(true);
+  const inventory = await response.json();
+  for (const name of ["@simpludify/core", "@simpludify/web"]) {
+    expect(inventory.find((p: { name: string }) => p.name === name)).toMatchObject({ version: "0.1.1", license: "MIT" });
+  }
+  expect((await (await request.get("THIRD-PARTY-NOTICES.txt")).text())).toContain("Vlad Shilov");
+  await page.setViewportSize({ width: 320, height: 740 });
+  for (let i = 0; i < 12; i++) await add(page, "wait", { "wait-count": "1" });
+  const commands = page.locator("#commands");
+  expect(await commands.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+  await commands.evaluate(el => { el.scrollTop = el.scrollHeight; });
+  await expect(page.getByRole("button", { name: "命令 12 を削除", exact: true })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.locator("#play")).toBeInViewport();
 });

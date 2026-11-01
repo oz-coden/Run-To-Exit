@@ -16,6 +16,8 @@ Run To Exit は、複数の人物の行動を事前に計画する、トップ�
 4. 実行中も次回の計画を編集できます。変更は現在の実行に反映されません。**↻ 再実行**で初期状態から編集済みの計画を実行します。
 5. Conflictが起きたらログと座標を確認し、計画を修正して再実行。全員が出口に到達するとクリアです。
 
+マップにはキーボードでもフォーカスでき、矢印キーで対象マスを移動、Enter / Spaceでそのマスの人物を選択できます。フォーム入力中のキー操作はマップに伝わりません。
+
 マップの空きマスを選ぶと自動移動の対象座標、スイッチを選ぶと操作対象を指定できます。座標欄からの直接指定も可能です。ログのイベントを選ぶと関連マスを強調します。命令番号を持つログでは関連する命令行も強調します。実行中の固定計画はパネル下の折りたたみで確認できます。
 
 ### 命令
@@ -69,11 +71,17 @@ npm run dev
 
 ### Simpludifyの固定と更新
 
-[Simpludify](https://github.com/oz-coden/Simpludify) のCore / Webをソースワークスペースとして利用しています。公式の `npm run create` を実行し、ゲームに必要なエンジンパッケージを `vendor/simpludify/` に収録しました。公開npm SDKへの依存ではありません。
+公開npm SDKの **`@simpludify/core@0.1.1` / `@simpludify/web@0.1.1`** を使用します。WebもCoreの0.1.1に依存し、`npm ci`で同一のCoreへ解決されます。ESMの公開exportからだけimportし、エンジンのソースコピーやビルド時のGitHub取得は行いません。Webの公開エントリから必要なCSSも読み込まれます。
 
-採用コミットは **`152ec2e35789ec512f53ea988d7f0d54d7ff1ead`**。元ソースを変更せず、公開パッケージのexportだけを使います。出典は [PROVENANCE.json](vendor/simpludify/PROVENANCE.json)、ライセンスは [MIT](vendor/simpludify/LICENSE)。ビルド時にSimpludifyのmainを取得しません。npm依存もlockfileで固定しています。
+`package.json`はSDKの版を完全固定し、`package-lock.json`は取得先とintegrityを固定します。更新時は両パッケージを同時に指定し、API差分と [SDK利用レビュー](docs/engine-review.md) を確認してください。
 
-更新は採用コミットを明示してソース差分をレビューし、vendor・出典・lockfileを更新して `npm run verify` を実行します。エンジン本体への改善候補は [API利用レビュー](docs/engine-review.md) に記録しています。
+```sh
+npm install --save-exact @simpludify/core@<version> @simpludify/web@<version>
+npm ci
+npm run verify
+```
+
+ビルドでは実行依存のライセンスを `dist/THIRD-PARTY-NOTICES.txt`、版・integrityの一覧を `dist/dependencies.json` に出力します。SimpludifyのMIT文面はインストール済みSDKから取得します。`@pixi/colord`の不足するMIT文面のみ `third-party/colord/LICENSE.md` で補います。
 
 ## テストと本番ビルド
 
@@ -97,7 +105,7 @@ GitHub Actionsは型検査・単体テスト・本番ビルド・少数のブラ
 
 ## 実装範囲と制約
 
-現在は1ステージ、2人、スイッチと期間付きゲートのプロトタイプです。描画にTilemap / Actor / Transform / Renderable、マップ操作にPointerEvent、人物選択にCanvas UI / Flex、イベント通知にSceneのEventBusを使います。長い命令列やフォームはDOMです。
+現在は1ステージ、2人、スイッチと期間付きゲートのプロトタイプです。描画にTilemap / Actor / Transform / Renderable、マップ操作にPointerEvent、人物選択にCanvas UI / Flex、描画補間にpresentation Tween、イベント通知にSceneのEventBusを使います。長い命令列やフォームはDOMです。
 
 - 命令は人物ごとに50個まで。自動再生は200ステップで一時停止します。
 - 計画はページ内で保持します。リロードすると編集内容は消えます。
