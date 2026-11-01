@@ -37,3 +37,15 @@
 変更ファイル: `package.json`、`package-lock.json`、`tsconfig.json`、`src/board.ts`、`src/main.ts`、`src/style.css`、`scripts/notices.mjs`、`third-party/`、`tests/e2e/game.spec.ts`、`README.md`、`docs/architecture.md`、`docs/engine-review.md`、本報告。削除対象は`vendor/`全体。
 
 未完了: 最終差分CIとレビュー、PRのReady化・main統合、Pages配信版での全E2E確認。実機iOS Safari / Firefoxは検証対象外。計画保存・追加ステージ等の既存未実装範囲はREADME参照。
+
+
+## main統合とCIログレビュー
+
+- 最終実装コミット: `ad7c977f0144d7d4676fbe64f4b4b2c3a6da464f`
+- ブランチCI: https://github.com/oz-coden/Run-To-Exit/actions/runs/41339672552 （成功。ただしE2E 1件は再試行）
+- PR #3をReady化してmainへマージ。マージコミット: `2c8b087063e2333ec9ae114b0b70714a593c76da`。
+- 詳細ログで狭幅のフォーカステストに時間依存の判定を検出。期待値がStep 2〜9だけを許可し、CIではフォーカス待ち中にStep 38へ進んでいた。ゲーム本体の失敗ではなく、テストの観測条件に上限がある問題。
+- 修正: フォーカス取得後の現在ステップを記録し、それより次のステップへ進んだ後もフォーカスが保持されることを検証。再試行での成功だけに依存しないよう追補CIを実行する。
+- 描画補間はブラウザ時計を制御し、開始・100ms・350msで人物の横位置が順に変化することも確認。
+
+この時点ではPagesデプロイ・公開版E2E確認を継続中。最終結果は下記の公開確認欄およびPRに記録する。

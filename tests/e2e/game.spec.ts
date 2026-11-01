@@ -220,7 +220,11 @@ test("keyboard map targeting stays isolated from form input and editor focus sur
   await page.locator("#play").click();
   const deleteCommand = page.getByRole("button", { name: "命令 1 を削除", exact: true });
   await deleteCommand.focus();
-  await expect(page.locator("#run-note")).toContainText(/世界 Step [2-9]。/);
+  const currentStep = async () => Number(
+    (await page.locator("#run-note").innerText()).match(/Step (\d+)/)?.[1],
+  );
+  const focusedAtStep = await currentStep();
+  await expect.poll(currentStep).toBeGreaterThan(focusedAtStep);
   await expect(deleteCommand).toBeFocused();
   await page.locator("#play").click();
 });
