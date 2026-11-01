@@ -28,7 +28,7 @@ root.innerHTML = `
       <div id="board" aria-label="脱出フロア。Aは(2,3)、Bは(2,5)。スイッチS1は(2,2)、S2は(2,6)、扉は(5,3)、出口は(8,3)。中央の壁は扉だけ通れます。"></div>
       <div class="legend"><span><i class="legend-a"></i>A アオ</span><span><i class="legend-b"></i>B ベニ</span><span><i class="legend-switch"></i>S1 / S2</span><span><i class="legend-exit"></i>出口</span><span id="gate-status">ゲート：閉鎖</span></div>
       <a class="mobile-jump" href="#plan-title">命令を編集する ↓</a>
-      <div class="transport"><button id="play" class="primary" disabled>▶ 再生開始</button><button id="step" disabled>1 ステップ →</button><button id="restart" title="編集中の計画を初期状態から実行">↻ 再実行</button><label class="speed-label">速度<select id="speed" aria-label="再生速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label></div>
+      <div class="transport"><button id="play" class="primary" disabled>▶ 再生開始</button><button id="step" disabled>1 ステップ →</button><button id="restart" disabled title="編集中の計画を初期状態から実行">↻ 再実行</button><label class="speed-label">速度<select id="speed" aria-label="再生速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label></div>
       <p id="run-note" class="note">人物を選び、右のパネルから命令を追加しよう。</p>
       <div id="outcome" hidden tabindex="-1"></div>
       <details class="guide" open><summary>はじめての脱出計画 <span>遊び方</span></summary><ol><li><b>A・B それぞれに命令を追加。</b>まず近くのスイッチを操作してみよう。</li><li><b>再生か1ステップで、全員が同時に行動。</b>スイッチの効果は翌ステップから。</li><li><b>ゲートが開いている間に、2人を出口へ。</b>同じマスへの進入や、前の人への追従には待機を使おう。</li></ol><p>操作範囲は同じマスか上下左右の隣。条件待機の解除にも1ステップ使うよ。マスの座標は左上が (0,0)。</p><details><summary>ヒント・攻略例</summary><p>Aは先に中央通路を進み、Bは右へ2マス、上へ2マス進んでから追いかけると、混雑を避けられる。</p><button id="load-solution">攻略例をセット</button><button id="load-conflict">衝突例をセット</button><p class="note">この2つのボタンは編集中の命令を置き換えます。</p></details></details>
@@ -37,7 +37,7 @@ root.innerHTML = `
       <div class="panel-heading"><h2 id="plan-title"><span class="eyebrow">YOUR PROGRAM</span>行動を計画する</h2><span id="draft-badge" class="pill">編集中</span></div>
       <a class="mobile-jump" href="#board">マップを見る ↑</a>
       <div class="character-tabs" role="group" aria-label="命令を編集する人物"><button data-person="A" aria-pressed="true"><span class="avatar a">A</span><span>アオ<small id="pos-A">(2, 3)</small></span><span class="command-count" id="count-A">0</span></button><button data-person="B" aria-pressed="false"><span class="avatar b">B</span><span>ベニ<small id="pos-B">(2, 5)</small></span><span class="command-count" id="count-B">0</span></button></div>
-      <p class="selected-title"><b id="selected-name">A アオ</b> の次回実行する計画 <span id="selected-cell">対象 (8, 3)</span></p>
+      <p class="selected-title"><b id="selected-name">A アオ</b> の次回実行する計画 <span id="selected-cell" aria-live="polite">対象 (8, 3)</span></p>
       <ol id="commands" class="commands" aria-label="編集中の命令列"></ol>
       <div class="builder"><label>追加する命令<select id="command-kind"><option value="move">方向へ移動</option><option value="go">座標まで自動移動</option><option value="interact">設備を操作</option><option value="wait">ステップ数で待機</option><option value="until">条件が成立するまで待機</option></select></label>
         <div id="move-fields" class="fields"><label>方向<select id="direction"><option value="up">↑ 上</option><option value="right">→ 右</option><option value="down">↓ 下</option><option value="left">← 左</option></select></label><label>マス数<input id="move-count" type="number" min="1" max="50" value="1" inputmode="numeric"></label></div>
@@ -237,6 +237,10 @@ function renderEditor(): void {
         highlightedCommand = null;
         renderEditor();
         renderStatus();
+        const remaining = $("commands").querySelectorAll<HTMLLIElement>(".command");
+        const next = Math.max(0, Math.min(remaining.length - 1, index + delta));
+        remaining[next]?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+        if (!remaining.length) $("add-command").focus();
       };
       li.append(button);
     }
@@ -414,7 +418,7 @@ listen("play", () => {
 listen("step", () => {
   playing = false;
   accumulator = 0;
-  takeStep(false);
+  takeStep();
 });
 listen("restart", () => {
   playing = false;
@@ -459,9 +463,11 @@ const game = new Game({
       `ゲームの起動または描画に失敗しました：${String(error)}`;
   },
 });
+game.element.setAttribute("tabindex", "0");
+game.element.setAttribute("role", "group");
 game.element.setAttribute(
   "aria-label",
-  "脱出フロア。Tabキーで人物を選択できます。",
+  "脱出フロア。矢印キーで対象マスを移動、Enterで人物を選択。Tabで人物ボタンへ。",
 );
 game.scene("puzzle", (context) => {
   board = new Board(game, context, stage, initial, select, pick);
@@ -492,6 +498,7 @@ game.scene("puzzle", (context) => {
 });
 try {
   await game.run("puzzle");
+  $<HTMLButtonElement>("restart").disabled = false;
   renderEditor();
   renderStatus();
 } catch (error) {

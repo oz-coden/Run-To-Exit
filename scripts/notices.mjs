@@ -4,7 +4,7 @@ import {
   readFileSync,
   readdirSync,
 } from "node:fs";
-copyFileSync("vendor/simpludify/LICENSE", "dist/SIMPLUDIFY-LICENSE.txt");
+copyFileSync("node_modules/@simpludify/core/LICENSE", "dist/SIMPLUDIFY-LICENSE.txt");
 const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
 const notices = [
   "Run To Exit uses Simpludify (MIT). See SIMPLUDIFY-LICENSE.txt.",
@@ -18,7 +18,7 @@ for (const [location, pkg] of Object.entries(lock.packages)) {
   );
   if (!files.length && meta.name === "@pixi/colord") {
     notices.push(
-      `${meta.name}@${pkg.version} (${meta.license})\n${readFileSync("vendor/simpludify/third-party/colord/LICENSE.md", "utf8")}`,
+      `${meta.name}@${pkg.version} (${meta.license})\n${readFileSync("third-party/colord/LICENSE.md", "utf8")}`,
     );
   } else {
     if (!files.length)
