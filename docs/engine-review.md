@@ -1,61 +1,51 @@
-# Simpludify公開APIの利用レビュー
+# Simpludify公開npm SDKの利用レビュー
 
-対象: `152ec2e35789ec512f53ea988d7f0d54d7ff1ead`。ゲームは公開exportのみを利用し、エンジン本体を変更していない。
+対象: **`@simpludify/core@0.1.1` / `@simpludify/web@0.1.1`**。エンジン本体を変更せず、npmパッケージの公開exportのみを使う。
 
-## 実際に利用した機能
+## 利用結果と責務
 
-GridのinBounds/get、Tilemap/SpriteSheet、Actor/Transform/Renderable、Game/Scene、CanvasButton/Row/Column/Label/Panel、PointerClick、defineEvent/Scene.events、setViewport、起動とdisposeを利用した。Gridのインデックスとworld座標の境界を明示でき、人物の同時更新は描画と独立して構築できた。
+Grid、Tilemap / SpriteSheet、Actor / Transform / Renderable、Game / Scene、CanvasButton / Row / Column / Label / Panel、PointerClick、defineEvent、setViewport、presentationTweens / Tween.bind / Easing、非同期起動とdisposeを利用する。従来の地形描画と入力は同じ公開APIで移行できた。WebのCore依存は完全固定0.1.1で、ゲーム側のCoreと重複しない。
+
+整数ステップ、同時移動、占有、Conflict時の全体ロールバック、命令スナップショット、経路探索、設備予約、ログはゲームの純粋モデルに残す。物理Collider、秒単位Timer、Tweenに離散世界の規則を担当させない。Tweenは確定済みWorld間の表示だけを補間する。
 
 ## 具体的な改善候補
 
-### 1. 必要なパッケージだけを固定して生成するゲーム用コマンド
+### 1. npm向け最小テンプレートと配布READMEの整合性
 
-```sh
-npm run create -- ../my-game
-```
+- 実現したいこと: npm版SDKを固定し、Viteで独立ゲームを開始する。
+- 制約: 配布0.1.1のREADMEは「v0.1.0」「配布準備中」「公開確認前」の表記と0.1.0の導入例が残る。パッケージ本体は0.1.1で取得・動作可能だが、初見では利用可能な版を判断しにくい。
+- 回避策: package.json、exports、実際のインストール結果を確認して両SDKを0.1.1に完全固定。CSSはWebエントリによる読込を使用。
+- 追加価値: 高い。汎用エンジン機能の追加は不要。
+- 提案: リリース時にREADMEの版・公開状態を検査し、npm/Vite最小テンプレートにPages base、型検査、dispose、CSSを含める。
 
-現状はエンジンのテスト、ベンチマーク、サイト、全サンプル、文書までコピーする。独立ゲームでは不要な内容の除去と、エントリ・Vite・テスト設定の再構成が必要だった。今回も生成後にCore/Webだけを選んでゲームのtoolchainを作成した。
+### 2. Canvas HUDとWorld Viewportの連動例
 
-改善案: `create --template game --engine-commit <sha>` のような最小構成を提供し、出典・固定ソース・lockfile・Pages base指定・起動コードを生成する。公開SDK化は今回のゲームの前提にしない。
+- 実現したいこと: 人物選択HUDの下だけをマップ表示・ポインター入力に使う。
+- 制約: Canvas UIはCSS寸法、Worldは論理解像度。公開setViewportで実現できるが、HUD高と余白をResizeObserverで共有する必要がある。
+- 回避策: Boardが要素サイズを監視し、上64px・下32pxを除くViewportを設定。PointerClickのworld座標をTilemap.worldToTileへ渡す。Scene破棄でObserverを解除。
+- 追加価値: 中。まず使用例の充実が適切。
+- 提案: CanvasNode.boundsとViewportを接続する公式サンプル、または所有者付きサイズ監視ヘルパー。ゲーム固有のHUD高をCoreへ追加しない。
 
-### 2. Canvasの相対パネルとワールド用Viewportの連動
+### 3. Canvas / DOM併用時のフォーカス方針
 
-```ts
-const resize = () => game.setViewport({
-  x: 0, y: 64,
-  width: game.element.clientWidth,
-  height: game.element.clientHeight - 96,
-});
-const observer = new ResizeObserver(resize);
-observer.observe(game.element);
-context.onDispose(() => observer.disconnect());
-```
+- 実現したいこと: Canvasの人物選択と、長い命令リスト・日本語フォームをキーボードとタッチで一緒に操作する。
+- 制約: Canvasのセマンティックミラーは人物選択を扱えるが、任意のTilemapセルへのキーボード移動や、DOM命令行を再生成した後のフォーカス先はアプリ側で決める必要がある。現SDKにSelectや数値入力があっても複雑な命令編集全体を移す利点は小さい。
+- 回避策: マップ本体に限定した矢印キー処理、対象座標のaria-live表示、命令並べ替え・削除後のフォーカス復帰を実装。数値入力とスクロールリストはDOMで維持。
+- 追加価値: 中。任意のゲーム規則を扱う巨大なウィジェットより、併用ガイドが有用。
+- 提案: CanvasミラーとDOMフォームのTab順序、キー所有権、フォーカス復帰の小さな公式例を用意する。
 
-Canvas UIはCSS寸法、Worldは論理解像度なので、HUDの下だけをマップ入力にするにはこの連動処理が必要だった。公開APIで実現可能だが、HUD高や余白の共有が手作業になる。
+### 4. 離散世界の表示Tweenを安全に置き換える例
 
-改善案: CanvasNode.boundsとViewportの接続例、または所有者に紐づくサイズ監視の補助APIを公式サンプルに追加する。ゲームごとの固定HUD高をCoreへ持ち込む必要はない。
+- 実現したいこと: 確定した整数座標間を自然に描画し、手動連打や再実行でも古い演出を残さない。
+- 制約: TransformそのものへTweenを適用すると表示と状態の区別が曖昧になる。actorTweenは描画専用チャネルを提供するが、複数人物と脱出フェードを同じ進捗で扱う場合には一つの表示進捗が簡潔。
+- 回避策: Boardの表示進捗へ明示的Tween.bindを作り、Scene.presentationTweensで再生。旧Tweenをfinishしてから新しいimmutableな始点・終点を設定し、同じ進捗で人物位置と脱出opacityを描画。所有者はScene。
+- 追加価値: 高いが、現公開APIで実現できる。
+- 提案: 確定状態を変えない表示補間、即時再実行、Tween置換・破棄を含むターン制サンプル。ゲーム専用の命令VMや競合解決器は不要。
 
-### 3. 長い命令リストはDOM併用が適している
+### 5. 再配布ライセンスの組み立て例
 
-```ts
-context.canvasUI(CanvasColumn([
-  CanvasRow(characterButtons, { gap: 8 }),
-  CanvasPanel([], { grow: 1 }),
-  CanvasLabel('人物を選択 → マスをタップ'),
-]));
-```
-
-Canvasの人物選択はマップに自然に統合できる。一方でスクロール、数値フォーム、命令の並べ替え、テキストログはDOMの方が小さなコードでキーボード操作まで扱える。現APIの責務分離に従い、Canvasに独自スクロールエディタを実装しなかった。
-
-改善案: CanvasとDOMの併用例とフォーカス移動のガイドを充実させる。Canvasにブラウザのフォーム機能を丸ごと再実装する提案ではない。
-
-### 4. 固定ステップとは別に、離散世界を制御する例
-
-```ts
-const result = advance(stage, snapshotPlan, world);
-if (result.ok) world = result.state;
-```
-
-整数ステップとトランザクションはRun To Exit側の規則。Scene.after/everyは秒単位なので設備の期限に使うとゲームの整数時間と結びつける追加コードが必要になる。Gridパズル向けに「Scene.onUpdateは表示のペース、世界更新は純粋関数」という短い公式例があると導入しやすい。
-
-改善案: 固定フレームを使う例に加えて、ターン制・命令実行型のサンプルを用意する。汎用の競合解決器や命令VMをエンジンに追加する必要はない。
+- 実現したいこと: 静的ゲームに同梱する実行依存すべてのライセンス文面を生成する。
+- 制約: SDKにはMITのLICENSEがあるが、推移依存`@pixi/colord@2.9.6`のnpm配布物にはライセンス本文が含まれていない。
+- 回避策: lockfileの実行依存を列挙して本文を連結し、この依存だけ固定MIT文面をthird-partyに保持。SDKソースの保管は不要。
+- 追加価値: 中。SDK本体の機能より配布ガイドの課題。
+- 提案: npmゲーム用テンプレートにNOTICE生成例を設け、推移依存の不足文面と出典を明示する。

@@ -167,6 +167,9 @@ function icon(command: Command): string {
     : { go: "◎", interact: "⌁", wait: "◷", until: "◇" }[command.kind];
 }
 function renderEditor(): void {
+  const focusedCommand = document.activeElement instanceof HTMLButtonElement
+    && $("commands").contains(document.activeElement)
+      ? document.activeElement.getAttribute("aria-label") : null;
   document
     .querySelectorAll<HTMLButtonElement>("[data-person]")
     .forEach((b) =>
@@ -246,6 +249,11 @@ function renderEditor(): void {
     }
     list.append(li);
   });
+  if (focusedCommand) {
+    const buttons = list.querySelectorAll<HTMLButtonElement>("button");
+    [...buttons].find((b) => b.getAttribute("aria-label") === focusedCommand && !b.disabled)
+      ?.focus({ preventScroll: true });
+  }
   const snapshot = $("snapshot-content");
   snapshot.replaceChildren();
   if (run)
