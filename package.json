@@ -13,7 +13,8 @@
     "build": "vite build --base /Run-To-Exit/ && node scripts/notices.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "test:e2e": "playwright test",
-    "verify": "npm run check && npm test && npm run build && npm run test:e2e"
+    "verify": "npm run check && npm test && npm run build && npm run test:e2e",
+    "test:sdk-candidate": "node scripts/test-sdk-candidate.mjs"
   },
   "dependencies": {
     "@simpludify/core": "0.1.2",
