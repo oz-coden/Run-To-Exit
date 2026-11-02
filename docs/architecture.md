@@ -2,7 +2,7 @@
 
 ## 公開npm SDKを使う独立プロジェクト
 
-Core / Webは公開npmパッケージの0.1.1を完全固定して導入する。`npm ci`とlockfileがローカル・CI共通の復元手順となる。WebのCore依存も0.1.1であり、ゲームの直接依存と同じパッケージを共有する。エンジンソースの収録、ローカルワークスペース、GitHub mainの取得は不要。
+Core / Webは公開npmパッケージの0.1.2を完全固定して導入する。`npm ci`とlockfileがローカル・CI共通の復元手順となる。WebのCore依存も0.1.2であり、ゲームの直接依存と同じパッケージを共有する。エンジンソースの収録、ローカルワークスペース、GitHub mainの取得は不要。
 
 CoreはDOM・Pixiを含まない。WebはGameの非同期起動、シーン、描画、ブラウザ入力を担当する。ゲームは両パッケージの公開exportだけを使い、配布物内部のパスには依存しない。ゲーム仕様のためのエンジン変更は行わない。
 
@@ -28,7 +28,7 @@ SceneのonUpdateが再生ペースを受け持つ。秒数の蓄積から整数�
 
 世界ステップはゲーム固有の整数時間なので、Sceneの秒単位Timerに設備予約を置かない。Timer APIは所有者付きの演出には使えるが、今回の扉予約はWorld内のシリアライズ可能なデータである。確定通知は `defineEvent<Run>` とSceneのEventBusを使い、設備判定の途中でイベントを配信しない。
 
-`Board` はScene所有のTilemap、Actor、Transform、Renderable、CanvasNodeを用い、地形と人物を表示する。閉じた扉や占有の判定はCollisionWorldではなく整数モデルが担当する。連続座標のSolid補正はパズル規則に不要。公開APIの `game.setViewport` で上部Canvas UIと下部マップ入力の領域を分ける。PointerClickのworld座標をTilemap.worldToTileへ渡す。
+`Board` はScene所有のTilemap、Actor、Transform、Renderable、CanvasNodeを用い、地形と人物を表示する。閉じた扉や占有の判定はCollisionWorldではなく整数モデルが担当する。連続座標のSolid補正はパズル規則に不要。CanvasのFlexレイアウトでWorld用の非対話領域を確保し、公開APIの `game.bindViewport(ui, region)` でViewportへ接続する。ヒントの折り返しやリサイズへの追従とScene破棄時の解放はSDKが担当し、Board固有のResizeObserverやHUDの固定高さを持たない。PointerClickのworld座標をTilemap.worldToTileへ渡す。
 
 Canvasの人物選択はエンジンのセマンティックミラーでキーボード操作できる。マップ本体もフォーカス可能で、対象座標の矢印移動とEnter / Spaceによる人物選択を持つ。キー処理はマップ要素自体にフォーカスした場合に限定し、フォームやCanvasボタンへ干渉しない。長い命令列、数値入力、ログはDOMを使い、命令並べ替え・削除後は残る操作へフォーカスを戻す。狭幅では命令列を縦スクロールし、再生操作を画面下へ固定する。
 

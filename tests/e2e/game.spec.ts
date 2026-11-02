@@ -3,6 +3,20 @@ async function open(page: Page) {
   await page.goto("./");
   await expect(page.locator("#play")).toBeEnabled();
 }
+async function boardProjection(page: Page, point = {x: 56 + 2.5 * 48, y: 32 + 6.5 * 48}) {
+  await page.locator("#board .simpludify").scrollIntoViewIfNeeded();
+  return page.evaluate(async (point) => {
+    const response = await fetch(new URL(".vite/manifest.json", document.baseURI));
+    if (!response.ok) throw new Error("Missing production asset manifest");
+    const manifest = await response.json();
+    const entry = manifest["src/main.ts"]?.file;
+    if (!entry) throw new Error("Missing game entry module");
+    const { game } = await import(new URL(entry, document.baseURI).href) as {game: import("@simpludify/web").Game};
+    const projected = game.worldToScreen({...point, space: "world"});
+    const box = game.element.getBoundingClientRect();
+    return {x:box.x + projected.x, y:box.y + projected.y, viewport:{...game.viewport}, width:game.element.clientWidth, height:game.element.clientHeight};
+  },point);
+}
 async function hint(page: Page, kind = "solution") {
   await page.getByText("ヒント・攻略例", { exact: true }).click();
   await page.locator(`#load-${kind}`).click();
@@ -152,16 +166,8 @@ test("Canvas pointer coordinates choose a cell and Canvas buttons choose a perso
   page,
 }, info) => {
   await open(page);
-  const surface = page.locator("#board .simpludify");
-  const box = await surface.boundingBox();
-  if (!box) throw new Error("Missing game surface");
-  const height = box.height - 96,
-    scale = Math.min(box.width / 640, height / 448);
-  const offsetX = (box.width - 640 * scale) / 2,
-    offsetY = 64 + (height - 448 * scale) / 2;
-  // Switch S2 at (2,6); use a real pointer/touch, not application state injection.
-  const x = box.x + offsetX + (56 + 2.5 * 48) * scale,
-    y = box.y + offsetY + (32 + 6.5 * 48) * scale;
+  // Project through the public Game API instead of copying HUD/Viewport constants.
+  const {x,y} = await boardProjection(page);
   if (info.project.use.hasTouch) await page.touchscreen.tap(x, y);
   else await page.mouse.click(x, y);
   await expect(page.locator("#command-kind")).toHaveValue("interact");
@@ -238,7 +244,7 @@ test("ships registry SDK inventory, license notices, and supports 320px command 
   expect(response.ok()).toBe(true);
   const inventory = await response.json();
   for (const name of ["@simpludify/core", "@simpludify/web"]) {
-    expect(inventory.find((p: { name: string }) => p.name === name)).toMatchObject({ version: "0.1.1", license: "MIT" });
+    expect(inventory.find((p: { name: string }) => p.name === name)).toMatchObject({ version: "0.1.2", license: "MIT" });
   }
   expect((await (await request.get("THIRD-PARTY-NOTICES.txt")).text())).toContain("Vlad Shilov");
   await page.setViewportSize({ width: 320, height: 740 });
@@ -249,4 +255,31 @@ test("ships registry SDK inventory, license notices, and supports 320px command 
   await expect(page.getByRole("button", { name: "命令 12 を削除", exact: true })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await expect(page.locator("#play")).toBeInViewport();
+});
+
+test("bound map viewport follows host resize and HUD taps keep world coordinates", async ({page}, info) => {
+  await open(page);
+  for (const width of [900, 390, 320]) {
+    await page.setViewportSize({width,height:844});
+    await expect.poll(async () => {
+      const view=await boardProjection(page);
+      return Math.abs(view.viewport.width - (view.width - 20));
+    }).toBeLessThan(0.1);
+    const view=await boardProjection(page);
+    expect(view.viewport.x).toBeCloseTo(10,1);
+    expect(view.viewport.y).toBeGreaterThanOrEqual(44);
+    expect(view.viewport.height).toBeGreaterThan(1);
+    expect(view.viewport.y + view.viewport.height).toBeLessThan(view.height - 10);
+    if(info.project.use.hasTouch) await page.touchscreen.tap(view.x,view.y);
+    else await page.mouse.click(view.x,view.y);
+    await expect(page.locator("#selected-cell")).toHaveText("対象 (2, 6)");
+    await expect(page.locator("#device")).toHaveValue("s2");
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  const button=await page.getByRole("button",{name:"B ベニ",exact:true}).boundingBox();
+  if(!button) throw new Error("Missing Canvas HUD button");
+  if(info.project.use.hasTouch) await page.touchscreen.tap(button.x+button.width/2,button.y+button.height/2);
+  else await page.mouse.click(button.x+button.width/2,button.y+button.height/2);
+  await expect(page.locator('[data-person="B"]')).toHaveAttribute("aria-pressed","true");
+  await expect(page.locator("#selected-cell")).toHaveText("対象 (2, 6)");
 });

@@ -100,7 +100,8 @@ export class Board {
       this.buttons.set(p.id, button);
       return button;
     });
-    context.canvasUI(
+    const region = CanvasPanel([], { grow: 1, pointerEvents: "none" });
+    const ui = context.canvasUI(
       CanvasColumn(
         [
           CanvasRow([...characterButtons, this.stepLabel], {
@@ -108,12 +109,13 @@ export class Board {
             minHeight: 44,
             shrink: 0,
           }),
-          CanvasPanel([], { grow: 1 }),
+          region,
           this.hint,
         ],
-        { padding: 10, gap: 6 },
+        { padding: 10, gap: 6, height: "100%" },
       ),
     );
+    game.bindViewport(ui, region);
     for (const [i, p] of stage.people.entries()) {
       const actor = new Actor({ id: `person-${p.id}` });
       const position = actor.add(new Transform());
@@ -152,21 +154,6 @@ export class Board {
       this.cursor = { x: cell.x, y: cell.y };
       pick(this.cursor);
     });
-    const resize = () => {
-      const width = game.element.clientWidth,
-        height = game.element.clientHeight;
-      if (width && height)
-        game.setViewport({
-          x: 0,
-          y: 64,
-          width,
-          height: Math.max(1, height - 96),
-        });
-    };
-    const observer = new ResizeObserver(resize);
-    observer.observe(game.element);
-    context.onActivate(resize);
-    context.onDispose(() => observer.disconnect());
     const keyboard = (event: KeyboardEvent) => {
       if (event.target !== game.element || event.altKey || event.ctrlKey || event.metaKey) return;
       const delta: Record<string, Point> = {

@@ -71,7 +71,7 @@ npm run dev
 
 ### Simpludifyの固定と更新
 
-公開npm SDKの **`@simpludify/core@0.1.1` / `@simpludify/web@0.1.1`** を使用します。WebもCoreの0.1.1に依存し、`npm ci`で同一のCoreへ解決されます。ESMの公開exportからだけimportし、エンジンのソースコピーやビルド時のGitHub取得は行いません。Webの公開エントリから必要なCSSも読み込まれます。
+公開npm SDKの **`@simpludify/core@0.1.2` / `@simpludify/web@0.1.2`** を使用します。WebもCoreの0.1.2に依存し、`npm ci`で同一のCoreへ解決されます。ESMの公開exportからだけimportし、エンジンのソースコピーやビルド時のGitHub取得は行いません。Webの公開エントリから必要なCSSも読み込まれます。
 
 `package.json`はSDKの版を完全固定し、`package-lock.json`は取得先とintegrityを固定します。更新時は両パッケージを同時に指定し、API差分と [SDK利用レビュー](docs/engine-review.md) を確認してください。
 
