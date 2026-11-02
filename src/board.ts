@@ -1,4 +1,6 @@
 import {
+	Action,
+	defineActions,
 	Actor,
 	Grid,
 	PointerClick,
@@ -10,7 +12,6 @@ import {
 	Tween,
 	Easing,
 	type TweenPlayback,
-	type Game,
 	type SceneContext,
 } from "@simpludify/web";
 import { same, type Point, type Stage, type World } from "./model";
@@ -44,12 +45,12 @@ export class Board {
 	private animation?: TweenPlayback;
 	private cursor: Point = { x: 8, y: 3 };
 	constructor(
-		game: Game,
 		private readonly context: SceneContext,
 		private readonly stage: Stage,
 		initial: World,
 		select: (id: string) => void,
 		pick: (point: Point) => void,
+		canTarget: () => boolean,
 	) {
 		this.previous = this.state = initial;
 		this.map = new Tilemap<Tile>({
@@ -107,46 +108,42 @@ export class Board {
 			this.cursor = { x: cell.x, y: cell.y };
 			pick(this.cursor);
 		});
-		const keyboard = (event: KeyboardEvent) => {
-			if (
-				event.target !== game.element ||
-				event.altKey ||
-				event.ctrlKey ||
-				event.metaKey
-			)
-				return;
-			const delta: Record<string, Point> = {
-				ArrowLeft: { x: -1, y: 0 },
-				ArrowRight: { x: 1, y: 0 },
-				ArrowUp: { x: 0, y: -1 },
-				ArrowDown: { x: 0, y: 1 },
-			};
-			if (delta[event.key]) {
-				event.preventDefault();
+		const keys = defineActions({
+			Left: Action.button(),
+			Right: Action.button(),
+			Up: Action.button(),
+			Down: Action.button(),
+			Confirm: Action.button(),
+		});
+		const controls = context.actions(keys, {
+			Left: { keys: ["ArrowLeft"] },
+			Right: { keys: ["ArrowRight"] },
+			Up: { keys: ["ArrowUp"] },
+			Down: { keys: ["ArrowDown"] },
+			Confirm: { keys: ["Enter", "Space"] },
+		});
+		for (const [action, dx, dy] of [
+			[keys.Left, -1, 0],
+			[keys.Right, 1, 0],
+			[keys.Up, 0, -1],
+			[keys.Down, 0, 1],
+		] as const)
+			controls.onPressed(action, () => {
+				if (!canTarget()) return;
 				this.cursor = {
-					x: Math.max(
-						0,
-						Math.min(this.map.width - 1, this.cursor.x + delta[event.key].x),
-					),
-					y: Math.max(
-						0,
-						Math.min(this.map.height - 1, this.cursor.y + delta[event.key].y),
-					),
+					x: Math.max(0, Math.min(this.map.width - 1, this.cursor.x + dx)),
+					y: Math.max(0, Math.min(this.map.height - 1, this.cursor.y + dy)),
 				};
 				pick(this.cursor);
-			} else if (event.key === "Enter" || event.key === " ") {
-				event.preventDefault();
-				const person = this.state.people.find(
-					(p) => !p.escaped && same(p, this.cursor),
-				);
-				if (person) select(person.id);
-				pick(this.cursor);
-			}
-		};
-		game.element.addEventListener("keydown", keyboard);
-		context.onDispose(() =>
-			game.element.removeEventListener("keydown", keyboard),
-		);
+			});
+		controls.onPressed(keys.Confirm, () => {
+			if (!canTarget()) return;
+			const person = this.state.people.find(
+				(p) => !p.escaped && same(p, this.cursor),
+			);
+			if (person) select(person.id);
+			pick(this.cursor);
+		});
 		this.sync(initial, false);
 	}
 	sync(state: World, animate: boolean, duration = 0.24): void {

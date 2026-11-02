@@ -3,8 +3,8 @@ const external = process.env.E2E_BASE_URL;
 export default defineConfig({
 	testDir: "./tests/e2e",
 	timeout: process.env.CHROMIUM_PATH ? 180000 : 60000,
-	fullyParallel: true,
-	workers: process.env.CI ? 2 : 2,
+	fullyParallel: false,
+	workers: 1,
 	retries: process.env.CI ? 1 : 0,
 	reporter: [["list"], ["html", { open: "never" }]],
 	use: {
@@ -13,7 +13,12 @@ export default defineConfig({
 		screenshot: "only-on-failure",
 		launchOptions: {
 			executablePath: process.env.CHROMIUM_PATH,
-			args: ["--no-sandbox", "--enable-unsafe-swiftshader", "--use-gl=angle", "--use-angle=swiftshader"],
+			args: [
+				"--no-sandbox",
+				"--enable-unsafe-swiftshader",
+				"--use-gl=angle",
+				"--use-angle=swiftshader",
+			],
 		},
 	},
 	projects: [
@@ -34,7 +39,14 @@ export default defineConfig({
 				hasTouch: true,
 			},
 		},
-	].flatMap(project => [project, { ...project, name: `${project.name}-canvas2d`, metadata: { renderer: "canvas2d" } }]),
+	].flatMap((project) => [
+		project,
+		{
+			...project,
+			name: `${project.name}-canvas2d`,
+			metadata: { renderer: "canvas2d" },
+		},
+	]),
 	webServer: external
 		? undefined
 		: {

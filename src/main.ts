@@ -31,6 +31,11 @@ import {
 import { collisionExample, solution, stage } from "./stage";
 import "./style.css";
 
+function errorText(error: unknown): string {
+	return error instanceof AggregateError
+		? error.errors.map(errorText).join("; ")
+		: String(error);
+}
 export const game = new Game({
 	parent: document.querySelector<HTMLElement>("#app")!,
 	resolution: { width: 640, height: 448 },
@@ -38,7 +43,7 @@ export const game = new Game({
 	tokens: { background: "#101f2a" },
 	onError: (e) =>
 		screen?.runNote.setText(
-			`ゲームの起動または描画に失敗しました：${String(e)}`,
+			`ゲームの起動または描画に失敗しました：${errorText(e)}`,
 		),
 });
 export let screen: ReturnType<typeof createScreen>;
@@ -328,12 +333,14 @@ function createScreen(context: SceneContext) {
 					}
 				}
 				draft[selected].push(command);
+				pendingFocus = add;
 				highlighted = null;
 				error.setText("");
 				renderCommands();
 				renderStatus();
 			} catch (e) {
 				error.setText((e as Error).message);
+				pendingFocus = add;
 			}
 		},
 		{ background: colors.accent },
@@ -524,54 +531,66 @@ function createScreen(context: SceneContext) {
 			commandRows.length !== draft[selected].length ||
 			commandRows.some((row, i) => row.command !== draft[selected][i])
 		) {
-			commands.clear();
+			const append =
+				renderedPerson === selected &&
+				commandRows.length > 0 &&
+				commandRows.length < draft[selected].length &&
+				commandRows.every((row, i) => row.command === draft[selected][i]);
+			if (!append) {
+				commands.clear();
+				commandRows = [];
+			}
+			const start = commandRows.length;
 			renderedPerson = selected;
-			commandRows = draft[selected].map((command, index) => {
-				const text = label(`${index + 1}. ${commandText(command)}`, {
-					color: colors.text,
-				});
-				const actions = (
-					[
-						[-1, "上へ移動", "↑"],
-						[1, "下へ移動", "↓"],
-						[0, "削除", "×"],
-					] as const
-				).map(([delta, title, glyph]) => {
-					const action = button(
-						`命令 ${index + 1} を${title} ${glyph}`,
-						() => {
-							const items = draft[selected];
-							if (!delta) items.splice(index, 1);
-							else
-								[items[index], items[index + delta]] = [
-									items[index + delta],
-									items[index],
-								];
-							highlighted = null;
-							renderCommands();
-							renderStatus();
-							const at = Math.max(
-								0,
-								Math.min(commandRows.length - 1, index + delta),
-							);
-							const focus =
-								commandRows[at]?.actions.find((n) => n.enabled) ?? add;
-							pendingFocus = focus;
-						},
-						{ grow: 1, padding: 6, fontSize: 12, minWidth: 0 },
+			commandRows.push(
+				...draft[selected].slice(start).map((command, offset) => {
+					const index = start + offset;
+					const text = label(`${index + 1}. ${commandText(command)}`, {
+						color: colors.text,
+					});
+					const actions = (
+						[
+							[-1, "上へ移動", "↑"],
+							[1, "下へ移動", "↓"],
+							[0, "削除", "×"],
+						] as const
+					).map(([delta, title, glyph]) => {
+						const action = button(
+							`命令 ${index + 1} を${title} ${glyph}`,
+							() => {
+								const items = draft[selected];
+								if (!delta) items.splice(index, 1);
+								else
+									[items[index], items[index + delta]] = [
+										items[index + delta],
+										items[index],
+									];
+								highlighted = null;
+								renderCommands();
+								renderStatus();
+								const at = Math.max(
+									0,
+									Math.min(commandRows.length - 1, index + delta),
+								);
+								const focus =
+									commandRows[at]?.actions.find((n) => n.enabled) ?? add;
+								pendingFocus = focus;
+							},
+							{ grow: 1, padding: 6, fontSize: 12, minWidth: 0 },
+						);
+						action.enabled =
+							!(delta === -1 && index === 0) &&
+							!(delta === 1 && index === draft[selected].length - 1);
+						return action;
+					});
+					const row = CanvasColumn(
+						[text, CanvasRow(actions, { gap: 4, shrink: 0 })],
+						{ gap: 6, padding: 8, background: colors.raised, shrink: 0 },
 					);
-					action.enabled =
-						!(delta === -1 && index === 0) &&
-						!(delta === 1 && index === draft[selected].length - 1);
-					return action;
-				});
-				const row = CanvasColumn(
-					[text, CanvasRow(actions, { gap: 4, shrink: 0 })],
-					{ gap: 6, padding: 8, background: colors.raised, shrink: 0 },
-				);
-				commands.add(row);
-				return { row, text, actions, command };
-			});
+					commands.add(row);
+					return { row, text, actions, command };
+				}),
+			);
 			if (!commandRows.length)
 				commands.add(
 					label(
@@ -580,6 +599,7 @@ function createScreen(context: SceneContext) {
 				);
 		}
 		for (const [index, row] of commandRows.entries()) {
+			row.actions[1].enabled = index < commandRows.length - 1;
 			const active =
 				run &&
 				JSON.stringify(run.plan[selected]?.[index]) ===
@@ -736,10 +756,13 @@ function createScreen(context: SceneContext) {
 	function focusLog(entry: LogEntry): void {
 		selectedLog = entry;
 		if (entry.actors[0]) select(entry.actors[0]);
-		highlighted =
-			entry.actors[0] && entry.command !== undefined
-				? { actor: entry.actors[0], index: entry.command }
-				: null;
+		const actor = entry.actors[0];
+		const index =
+			entry.command ??
+			(entry.kind === "conflict"
+				? run?.conflict?.commands.find((c) => c.actor === actor)?.index
+				: undefined);
+		highlighted = actor && index !== undefined ? { actor, index } : null;
 		snapshotOpen = true;
 		snapshot.visible = true;
 		snapshotToggle.setText("現在実行中の計画を隠す");
@@ -776,17 +799,31 @@ function createScreen(context: SceneContext) {
 
 	ui = context.canvasUI(root);
 	game.bindViewport(ui, region);
-	board = new Board(game, context, stage, initial, select, pick);
+	board = new Board(
+		context,
+		stage,
+		initial,
+		select,
+		pick,
+		() => mapPanel.visible && !ui.focusedNode,
+	);
 	board.select(selected);
 	board.focus();
 	renderStatus();
 	renderLog();
 	responsive();
+	context.onDeactivate(() => {
+		playing = false;
+		if (!ui.disposed) ui.focus();
+	});
 	context.onUpdate((seconds) => {
 		if (pendingFocus && pendingFocus.bounds.width > 0) {
 			const node = pendingFocus;
 			pendingFocus = undefined;
-			if (node.available) ui.focus(node);
+			if (node.available) {
+				if (ui.focusedNode === node) ui.focus();
+				ui.focus(node);
+			}
 		}
 		const narrow = root.bounds.width < 850;
 		if (narrow !== compact) {

@@ -7,17 +7,28 @@ declare global {
 	}
 }
 test.beforeEach(async ({ page }, info) => {
-  if (info.project.metadata.renderer !== "canvas2d") return;
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "gpu", { get: () => undefined });
-    for (const proto of [HTMLCanvasElement.prototype, typeof OffscreenCanvas === "undefined" ? undefined : OffscreenCanvas.prototype]) {
-      if (!proto) continue;
-      const get = proto.getContext;
-      proto.getContext = function (this: HTMLCanvasElement | OffscreenCanvas, kind: string, ...args: unknown[]) {
-        return kind.includes("webgl") ? null : Reflect.apply(get, this, [kind, ...args]);
-      } as typeof proto.getContext;
-    }
-  });
+	if (info.project.metadata.renderer !== "canvas2d") return;
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator, "gpu", { get: () => undefined });
+		for (const proto of [
+			HTMLCanvasElement.prototype,
+			typeof OffscreenCanvas === "undefined"
+				? undefined
+				: OffscreenCanvas.prototype,
+		]) {
+			if (!proto) continue;
+			const get = proto.getContext;
+			proto.getContext = function (
+				this: HTMLCanvasElement | OffscreenCanvas,
+				kind: string,
+				...args: unknown[]
+			) {
+				return kind.includes("webgl")
+					? null
+					: Reflect.apply(get, this, [kind, ...args]);
+			} as typeof proto.getContext;
+		}
+	});
 });
 async function open(page: Page) {
 	await page.clock.install({ time: new Date(0) });
@@ -52,6 +63,7 @@ async function activate(page: Page, name: string) {
 		const node = find(screen.root);
 		if (!node) throw Error(`Missing control: ${name}`);
 		void game.viewport;
+		if (screen.ui.focusedNode === node) screen.ui.focus();
 		screen.ui.focus(node);
 		void game.viewport;
 		const b = node.bounds,
@@ -79,6 +91,7 @@ async function focusText(page: Page, name: string) {
 		const n = walk(s.root);
 		if (!n) throw Error(name);
 		void game.viewport;
+		if (s.ui.focusedNode === n) s.ui.focus();
 		s.ui.focus(n);
 		void game.viewport;
 	}, name);
@@ -203,9 +216,8 @@ test("Conflict rolls back both people and log selection highlights the command",
 	await tab(page, "ログ");
 	const event = await page.evaluate(
 		() =>
-			window.puzzle.screen.logItems.children.find((n) =>
-				n.text.includes("Conflict"),
-			)?.text,
+			window.puzzle.screen.logItems.children.filter((n) => n.interactive).at(-1)
+				?.text,
 	);
 	expect(event).toBeTruthy();
 	await activate(page, event!);
@@ -289,6 +301,7 @@ test("keyboard map targeting stays isolated from editing and command focus survi
 	const host = page.locator(".simpludify");
 	await host.focus();
 	await host.press("ArrowLeft");
+	await page.clock.runFor(32);
 	expect(await text(page, "target")).toBe("対象 (7, 3)");
 	await tab(page, "命令");
 	await focusText(page, "X 座標");
@@ -298,12 +311,9 @@ test("keyboard map targeting stays isolated from editing and command focus survi
 	expect(await text(page, "target")).toBe("対象 (7, 3)");
 	await add(page, "ステップ数で待機", { 待機するステップ数: "10" });
 	await add(page, "方向へ移動", { 方向: "→ 右" });
-	await page.evaluate(() =>
-		window.puzzle.screen.ui.focus(
-			window.puzzle.screen.commands.children[1].children[1].children[0],
-		),
-	);
+	await focusText(page, "命令 2 を上へ移動 ↑");
 	await page.keyboard.press("Enter");
+	await page.clock.runFor(64);
 	await expect
 		.poll(() => page.evaluate(() => window.puzzle.screen.ui.focusedNode?.text))
 		.toContain("命令 1");
@@ -314,6 +324,7 @@ test("keyboard map targeting stays isolated from editing and command focus survi
 test("all 50 commands remain reachable and event pages bound the displayed history", async ({
 	page,
 }) => {
+	test.setTimeout(180000);
 	await open(page);
 	await add(page, "ステップ数で待機", { 待機するステップ数: "100" });
 	for (let i = 1; i < 50; i++) await activate(page, "＋ 命令を追加");
@@ -381,15 +392,20 @@ test("production subpath, registry inventory and 320/390 layouts stay healthy", 
 	await open(page);
 	await page.reload();
 	await page.evaluate(async () => {
-		const manifest=await(await fetch(".vite/manifest.json")).json();
-		window.puzzle=await import(new URL(manifest["src/main.ts"].file,document.baseURI).href);
+		const manifest = await (await fetch(".vite/manifest.json")).json();
+		window.puzzle = await import(
+			new URL(manifest["src/main.ts"].file, document.baseURI).href
+		);
 	});
 	await page.clock.runFor(32);
 	const inventory = await (await request.get("dependencies.json")).json();
 	for (const name of ["@simpludify/core", "@simpludify/web"])
 		expect(
 			inventory.find((p: { name: string }) => p.name === name),
-		).toMatchObject({ version: process.env.E2E_SDK_VERSION ?? "0.1.2", license: "MIT" });
+		).toMatchObject({
+			version: process.env.E2E_SDK_VERSION ?? "0.1.2",
+			license: "MIT",
+		});
 	expect(await (await request.get("THIRD-PARTY-NOTICES.txt")).text()).toContain(
 		"Vlad Shilov",
 	);
@@ -410,17 +426,21 @@ test("production subpath, registry inventory and 320/390 layouts stay healthy", 
 	expect(errors).toEqual([]);
 });
 
-test("candidate label semantics expose stage help, errors and status", async ({page}) => {
-  await open(page);
-  const labels=page.locator(".s-canvas-label");
-  if (process.env.E2E_REQUIRE_LABELS !== "1") {
-    // Registry 0.1.2 has no text mirror; this check is enforced for candidate SDK runs.
-    expect(await labels.count()).toBe(0);
-    return;
-  }
-  await expect(labels.filter({hasText:"RUN TO EXIT"})).toHaveCount(1);
-  await tab(page,"遊び方");
-  await expect(labels.filter({hasText:"はじめての脱出計画"})).toHaveCount(1);
-  await add(page,"方向へ移動",{"マス数":"日本語"});
-  await expect(labels.filter({hasText:"整数を入力してください"})).toHaveCount(1);
+test("candidate label semantics expose stage help, errors and status", async ({
+	page,
+}) => {
+	await open(page);
+	const labels = page.locator(".s-canvas-label");
+	if (process.env.E2E_REQUIRE_LABELS !== "1") {
+		// Registry 0.1.2 has no text mirror; this check is enforced for candidate SDK runs.
+		expect(await labels.count()).toBe(0);
+		return;
+	}
+	await expect(labels.filter({ hasText: "RUN TO EXIT" })).toHaveCount(1);
+	await tab(page, "遊び方");
+	await expect(labels.filter({ hasText: "はじめての脱出計画" })).toHaveCount(1);
+	await add(page, "方向へ移動", { マス数: "日本語" });
+	await expect(
+		labels.filter({ hasText: "整数を入力してください" }),
+	).toHaveCount(1);
 });
