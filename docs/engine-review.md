@@ -1,12 +1,18 @@
 # Simpludify公開npm SDKの利用レビュー
 
-対象: **`@simpludify/core@0.1.2` / `@simpludify/web@0.1.2`**。エンジン本体を変更せず、npmパッケージの公開exportのみを使う。
+対象: **`@simpludify/core@0.1.2` / `@simpludify/web@0.1.2`**。通常依存は公開npm SDKに固定し、未公開の汎用改善は候補tarballを別ディレクトリに導入して検証する。
 
 ## 利用結果と責務
 
 Grid、Tilemap / SpriteSheet、Actor / Transform / Renderable、Game / Scene、CanvasButton / Row / Column / Label / Panel、PointerClick、defineEvent、bindViewport、presentationTweens / Tween.bind / Easing、非同期起動とdisposeを利用する。従来の地形描画と入力は同じ公開APIで移行できた。WebのCore依存は完全固定0.1.2で、ゲーム側のCoreと重複しない。
 
 整数ステップ、同時移動、占有、Conflict時の全体ロールバック、命令スナップショット、経路探索、設備予約、ログはゲームの純粋モデルに残す。物理Collider、秒単位Timer、Tweenに離散世界の規則を担当させない。Tweenは確定済みWorld間の表示だけを補間する。
+
+## Canvas UI全面移行の追加検証
+
+フォーム、ログ、再生操作、ヘルプをCanvas UIへ移した。既存のSelect/TextInput/Scroll/Flex、単一親所有、clear/move/focusで組み立てられるため、ゲーム専用ウィジェットや新しい状態フレームワークは追加しない。
+
+実利用では、非対話ラベルのセマンティックミラー欠落、動的レイアウト直後と同一ノードへの再フォーカス、破棄中のフォーカス対象からの無効化通知が汎用SDKの課題として見つかった。次回SDK候補で修正し、世界モデルは変更しない。詳しい差分、コード量、検証結果と公開条件は[作業報告](work-reports/2026-11-02-canvas-ui.md)にまとめる。
 
 ## v0.1.2での改善結果
 

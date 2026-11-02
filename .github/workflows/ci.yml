@@ -13,6 +13,10 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, compact, narrow, desktop-canvas2d, compact-canvas2d, narrow-canvas2d]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,21 +28,21 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --project=${{ matrix.project }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: browser-report
+          name: browser-report-${{ matrix.project }}
           path: |
             playwright-report
             test-results
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: web-build
+          name: web-build-${{ matrix.project }}
           path: dist
       - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && matrix.project == 'desktop'
         with:
           path: dist
   deploy:

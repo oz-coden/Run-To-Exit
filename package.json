@@ -13,15 +13,18 @@
     "build": "vite build --base /Run-To-Exit/ && node scripts/notices.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "test:e2e": "playwright test",
-    "verify": "npm run check && npm test && npm run build && npm run test:e2e"
+    "verify": "npm run check && npm test && npm run build && npm run test:e2e",
+    "test:sdk-candidate": "node scripts/test-sdk-candidate.mjs"
   },
   "dependencies": {
-    "@simpludify/core": "0.1.2",
-    "@simpludify/web": "0.1.2"
+    "@simpludify/core": "0.1.3",
+    "@simpludify/web": "0.1.3"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "@types/node": "24.10.0",
+    "@types/pngjs": "6.0.5",
+    "pngjs": "7.0.0",
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.0.5"
