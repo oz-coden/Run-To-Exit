@@ -7,6 +7,9 @@ declare global {
 		puzzle: Puzzle;
 	}
 }
+test.afterEach(async ({}, info) => {
+	for (const error of info.errors) console.error(error.message ?? error);
+});
 test.beforeEach(async ({ page }, info) => {
 	if (info.project.metadata.renderer !== "canvas2d") return;
 	await page.addInitScript(() => {

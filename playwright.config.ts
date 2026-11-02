@@ -6,6 +6,7 @@ export default defineConfig({
 	fullyParallel: false,
 	workers: 1,
 	retries: process.env.CI ? 1 : 0,
+	maxFailures: process.env.CI ? 1 : undefined,
 	reporter: [["list"], ["html", { open: "never" }]],
 	use: {
 		baseURL: external ?? "http://127.0.0.1:4173/Run-To-Exit/",
