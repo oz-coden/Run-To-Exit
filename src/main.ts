@@ -70,11 +70,10 @@ function createScreen(context: SceneContext) {
 		CanvasLabel(text, { ...small, ...style });
 	const button = (text: string, action: () => void, style: CanvasStyle = {}) =>
 		CanvasButton(text, action, { ...control, ...style });
-	const field = (name: string, value: string) =>
-		CanvasTextInput(
-			{ label: name, value },
-			{ ...control, width: "100%", height: 44 },
-		);
+  const field = (name: string, value: string) => {
+    const options = { label: name, value, inputMode: "numeric" as const };
+    return CanvasTextInput(options, {...control, width: "100%", height: 44});
+  };
 	const choose = <T extends string>(
 		name: string,
 		options: readonly (readonly [T, string])[],
@@ -576,7 +575,7 @@ function createScreen(context: SceneContext) {
 									commandRows[at]?.actions.find((n) => n.enabled) ?? add;
 								pendingFocus = focus;
 							},
-							{ grow: 1, padding: 6, fontSize: 12, minWidth: 0 },
+							{ grow: 1, shrink: 1, padding: 6, fontSize: 12, minWidth: 0 },
 						);
 						action.enabled =
 							!(delta === -1 && index === 0) &&

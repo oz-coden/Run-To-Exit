@@ -68,6 +68,7 @@ async function activate(page: Page, name: string) {
 		void game.viewport;
 		const b = node.bounds,
 			r = game.element.getBoundingClientRect();
+		if (!screen.ui.containsNode(node, b.x + b.width / 2, b.y + b.height / 2)) throw Error(`Canvas control center is clipped: ${name}`);
 		return {
 			x: r.x + (b.x + b.width / 2) * screen.ui.scale,
 			y: r.y + (b.y + b.height / 2) * screen.ui.scale,
@@ -336,11 +337,10 @@ test("all 50 commands remain reachable and event pages bound the displayed histo
 			page.evaluate(() => window.puzzle.screen.commands.children.length),
 		)
 		.toBe(49);
-	await transport(page, "▶ 再生開始");
-	await select(page, "再生速度", "4×");
-	// Advance actual transport repeatedly with a controlled clock, preserving per-step updates.
-	await page.clock.runFor(16000);
-	await activate(page, "Ⅱ 一時停止");
+    await transport(page, "1 ステップ →");
+    // Generate a long history through the public UI command; do not inject a plan/world snapshot.
+    await page.evaluate(() => { for (let i = 0; i < 90; i++) window.puzzle.screen.step.activate(); });
+    await page.clock.runFor(64);
 	await tab(page, "ログ");
 	await select(page, "ログ表示", "すべて");
 	expect(
@@ -440,6 +440,7 @@ test("candidate label semantics expose stage help, errors and status", async ({
 	await tab(page, "遊び方");
 	await expect(labels.filter({ hasText: "はじめての脱出計画" })).toHaveCount(1);
 	await add(page, "方向へ移動", { マス数: "日本語" });
+	await expect(page.getByRole("textbox", { name: "マス数", exact: true })).toHaveAttribute("inputmode", "numeric");
 	await expect(
 		labels.filter({ hasText: "整数を入力してください" }),
 	).toHaveCount(1);
