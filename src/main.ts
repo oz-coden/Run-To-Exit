@@ -9,6 +9,7 @@ import {
 	CanvasTextInput,
 	Game,
 	type CanvasNode,
+	type CanvasLabelOptions,
 	type CanvasStyle,
 	type CanvasUI,
 	type SceneContext,
@@ -66,8 +67,10 @@ function createScreen(context: SceneContext) {
 		background: colors.raised,
 		shrink: 0,
 	};
-	const label = (text: string, style: CanvasStyle = {}) =>
+	const label = (text: string | CanvasLabelOptions, style: CanvasStyle = {}) =>
 		CanvasLabel(text, { ...small, ...style });
+	const heading = (text: string, level: 1 | 2 = 2, style: CanvasStyle = {}) =>
+		label({ text, role: "heading", level }, { fontSize: 20, color: colors.text, ...style });
 	const button = (text: string, action: () => void, style: CanvasStyle = {}) =>
 		CanvasButton(text, action, { ...control, ...style });
   const field = (name: string, value: string) => {
@@ -91,7 +94,6 @@ function createScreen(context: SceneContext) {
 		accumulator = 0,
 		board: Board | undefined,
 		ui: CanvasUI;
-	let pendingFocus: CanvasNode | undefined;
 	let highlighted: { actor: string; index: number } | null = null;
 	let selectedLog: LogEntry | undefined;
 	let tab = "map",
@@ -100,14 +102,14 @@ function createScreen(context: SceneContext) {
 	const PAGE_SIZE = 80;
 	const initial = initialWorld(stage);
 	const world = () => run?.state ?? initial;
-	const status = label("計画中", { fontSize: 16, color: colors.text });
+	const status = label({ text: "計画中", role: "status" }, { fontSize: 16, color: colors.text });
 	const runNote = label("人物を選び、命令を追加しよう。"),
 		outcome = label("");
 	const gate = label(""),
 		positions = label(""),
-		target = label("対象 (8, 3)");
+		target = label({ text: "対象 (8, 3)", role: "status" });
 	const draftBadge = label("編集中"),
-		error = label("", { color: 0xffb2a6 });
+		error = label({ text: "", role: "alert" }, { color: 0xffb2a6 });
 	const play = button("▶ 再生開始", () => {
 		if (!run) newRun();
 		playing = !playing;
@@ -145,7 +147,7 @@ function createScreen(context: SceneContext) {
 	});
 	const mapPanel = CanvasColumn(
 		[
-			label("01 / ふたつの合図", { fontSize: 20, color: colors.text }),
+			heading("01 / ふたつの合図"),
 			label("S1とS2を同時に操作 → ゲート開放6ステップ"),
 			region,
 			positions,
@@ -332,14 +334,14 @@ function createScreen(context: SceneContext) {
 					}
 				}
 				draft[selected].push(command);
-				pendingFocus = add;
 				highlighted = null;
 				error.setText("");
 				renderCommands();
 				renderStatus();
+				ui.focus(add);
 			} catch (e) {
 				error.setText((e as Error).message);
-				pendingFocus = add;
+				ui.focus(add);
 			}
 		},
 		{ background: colors.accent },
@@ -361,7 +363,7 @@ function createScreen(context: SceneContext) {
 	);
 	const editor = CanvasScroll(
 		[
-			label("行動を計画する", { fontSize: 20, color: colors.text }),
+			heading("行動を計画する"),
 			draftBadge,
 			CanvasRow(peopleButtons, { gap: 8, shrink: 0 }),
 			target,
@@ -397,7 +399,7 @@ function createScreen(context: SceneContext) {
 	const logScroll = CanvasScroll([logItems], { grow: 1, minHeight: 100 });
 	const logs = CanvasColumn(
 		[
-			label("実行ログ", { fontSize: 20, color: colors.text }),
+			heading("実行ログ"),
 			filter,
 			label("イベントを選ぶと、関係するマスと実行時の命令を強調します。"),
 			logRange,
@@ -418,7 +420,7 @@ function createScreen(context: SceneContext) {
 	};
 	const help = CanvasScroll(
 		[
-			label("はじめての脱出計画", { fontSize: 20, color: colors.text }),
+			heading("はじめての脱出計画"),
 			label("1. A・Bそれぞれに命令を追加。近くのスイッチを操作してみよう。"),
 			label(
 				"2. 再生か1ステップで、全員が同時に行動。スイッチの効果は翌ステップから。",
@@ -486,7 +488,7 @@ function createScreen(context: SceneContext) {
 		[
 			CanvasRow(
 				[
-					label("RUN TO EXIT", { fontSize: 20, color: colors.text, grow: 1 }),
+					heading("RUN TO EXIT", 1, { grow: 1 }),
 					status,
 				],
 				{ gap: 8, wrap: true, shrink: 0 },
@@ -573,7 +575,7 @@ function createScreen(context: SceneContext) {
 								);
 								const focus =
 									commandRows[at]?.actions.find((n) => n.enabled) ?? add;
-								pendingFocus = focus;
+								ui.focus(focus);
 							},
 							{ grow: 1, shrink: 1, padding: 6, fontSize: 12, minWidth: 0 },
 						);
@@ -813,17 +815,8 @@ function createScreen(context: SceneContext) {
 	responsive();
 	context.onDeactivate(() => {
 		playing = false;
-		if (!ui.disposed) ui.focus();
 	});
 	context.onUpdate((seconds) => {
-		if (pendingFocus && pendingFocus.bounds.width > 0) {
-			const node = pendingFocus;
-			pendingFocus = undefined;
-			if (node.available) {
-				if (ui.focusedNode === node) ui.focus();
-				ui.focus(node);
-			}
-		}
 		const narrow = root.bounds.width < 850;
 		if (narrow !== compact) {
 			compact = narrow;

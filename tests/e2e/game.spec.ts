@@ -83,6 +83,28 @@ async function activate(page: Page, name: string) {
 async function tab(page: Page, name: string) {
 	await page.getByRole("button", { name, exact: true }).press("Enter");
 	await page.clock.runFor(32);
+	// A semantic mirror can remain usable while a recycled GPU cache paints blank.
+	const pixel = await page.evaluate((name) => {
+		const { game, screen } = window.puzzle;
+		game.setViewport();
+		const node = screen.tabs.find((node) => node.text === name);
+		const canvas = game.element.querySelector("canvas");
+		if (!node || !canvas) throw Error("Missing tab paint target");
+		const copy = document.createElement("canvas");
+		copy.width = canvas.width;
+		copy.height = canvas.height;
+		const context = copy.getContext("2d");
+		if (!context) throw Error("Missing pixel reader");
+		context.drawImage(canvas, 0, 0);
+		return [...context.getImageData(
+			Math.round((node.bounds.x + 8) * screen.ui.scale * canvas.width / game.element.clientWidth),
+			Math.round((node.bounds.y + 8) * screen.ui.scale * canvas.height / game.element.clientHeight),
+			1, 1,
+		).data];
+	}, name);
+	expect(pixel[3]).toBe(255);
+	for (const [channel, expected] of [0x41, 0x6c, 0x76].entries())
+		expect(Math.abs(pixel[channel] - expected)).toBeLessThanOrEqual(22);
 }
 async function focusText(page: Page, name: string) {
 	await page.evaluate(async (name) => {
@@ -403,7 +425,7 @@ test("production subpath, registry inventory and 320/390 layouts stay healthy", 
 		expect(
 			inventory.find((p: { name: string }) => p.name === name),
 		).toMatchObject({
-			version: process.env.E2E_SDK_VERSION ?? "0.1.2",
+			version: process.env.E2E_SDK_VERSION ?? "0.1.3",
 			license: "MIT",
 		});
 	expect(await (await request.get("THIRD-PARTY-NOTICES.txt")).text()).toContain(
@@ -426,22 +448,21 @@ test("production subpath, registry inventory and 320/390 layouts stay healthy", 
 	expect(errors).toEqual([]);
 });
 
-test("candidate label semantics expose stage help, errors and status", async ({
+test("label semantics expose stage help, errors and status", async ({
 	page,
 }) => {
 	await open(page);
 	const labels = page.locator(".s-canvas-label");
-	if (process.env.E2E_REQUIRE_LABELS !== "1") {
-		// Registry 0.1.2 has no text mirror; this check is enforced for candidate SDK runs.
-		expect(await labels.count()).toBe(0);
-		return;
-	}
 	await expect(labels.filter({ hasText: "RUN TO EXIT" })).toHaveCount(1);
+	await expect(page.getByRole("heading", { name: "RUN TO EXIT", level: 1 })).toHaveCount(1);
+	await expect(page.getByRole("status").filter({ hasText: "計画中" })).toHaveAttribute("aria-live", "polite");
 	await tab(page, "遊び方");
 	await expect(labels.filter({ hasText: "はじめての脱出計画" })).toHaveCount(1);
+	await expect(page.getByRole("heading", { name: "はじめての脱出計画", level: 2 })).toHaveCount(1);
 	await add(page, "方向へ移動", { マス数: "日本語" });
 	await expect(page.getByRole("textbox", { name: "マス数", exact: true })).toHaveAttribute("inputmode", "numeric");
 	await expect(
 		labels.filter({ hasText: "整数を入力してください" }),
 	).toHaveCount(1);
+	await expect(page.getByRole("alert")).toContainText("整数を入力してください");
 });
