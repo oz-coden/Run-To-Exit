@@ -162,7 +162,7 @@ test("Canvas pointer coordinates choose a cell and Canvas buttons choose a perso
   // Switch S2 at (2,6); use a real pointer/touch, not application state injection.
   const x = box.x + offsetX + (56 + 2.5 * 48) * scale,
     y = box.y + offsetY + (32 + 6.5 * 48) * scale;
-  if (info.project.name === "narrow") await page.touchscreen.tap(x, y);
+  if (info.project.use.hasTouch) await page.touchscreen.tap(x, y);
   else await page.mouse.click(x, y);
   await expect(page.locator("#command-kind")).toHaveValue("interact");
   await expect(page.locator("#device")).toHaveValue("s2");
