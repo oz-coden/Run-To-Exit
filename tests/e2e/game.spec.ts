@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import type { CanvasNode } from "@simpludify/web";
+import { PNG } from "pngjs";
 type Puzzle = typeof import("../../src/main");
-const activeTabs = new WeakMap<Page, string>();
 declare global {
 	interface Window {
 		puzzle: Puzzle;
@@ -50,7 +50,6 @@ async function open(page: Page) {
 	await expect
 		.poll(() => page.evaluate(() => window.puzzle.screen.root.bounds.width))
 		.toBeGreaterThan(0);
-	activeTabs.set(page, "マップ");
 }
 async function text(page: Page, name: keyof Puzzle["screen"]) {
 	return page.evaluate(
@@ -86,27 +85,26 @@ async function activate(page: Page, name: string) {
 	await page.clock.runFor(32);
 }
 async function tab(page: Page, name: string) {
-	const changed = activeTabs.get(page) !== name;
 	await page.getByRole("button", { name, exact: true }).press("Enter");
 	await page.clock.runFor(32);
-	activeTabs.set(page, name);
-	if (!changed) return;
+}
+async function assertTabPaint(page: Page, name: string) {
 	// A semantic mirror can remain usable while a recycled GPU cache paints blank.
-	const pixel = await page.evaluate((name) => {
+	const point = await page.evaluate((name) => {
 		const { game, screen } = window.puzzle;
-		game.setViewport();
 		const node = screen.tabs.find((node) => node.text === name);
-		const canvas = game.element.querySelector("canvas");
-		if (!node || !canvas) throw Error("Missing tab paint target");
-		const copy = document.createElement("canvas");
-		copy.width = copy.height = 1;
-		const context = copy.getContext("2d");
-		if (!context) throw Error("Missing pixel reader");
-		const x = Math.round((node.bounds.x + 8) * screen.ui.scale * canvas.width / game.element.clientWidth);
-		const y = Math.round((node.bounds.y + 8) * screen.ui.scale * canvas.height / game.element.clientHeight);
-		context.drawImage(canvas, x, y, 1, 1, 0, 0, 1, 1);
-		return [...context.getImageData(0, 0, 1, 1).data];
+		if (!node) throw Error("Missing tab paint target");
+		const bounds = game.element.getBoundingClientRect();
+		return {
+			x: Math.round(bounds.x + (node.bounds.x + 8) * screen.ui.scale),
+			y: Math.round(bounds.y + (node.bounds.y + 8) * screen.ui.scale),
+			width: 1,
+			height: 1,
+		};
 	}, name);
+	// Browser capture reads the composited result; Canvas drawImage/getImageData
+	// forces a very expensive GPU readback on some software-WebGL runtimes.
+	const pixel = PNG.sync.read(await page.screenshot({ clip: point, scale: "css" })).data;
 	expect(pixel[3]).toBe(255);
 	for (const [channel, expected] of [0x41, 0x6c, 0x76].entries())
 		expect(Math.abs(pixel[channel] - expected)).toBeLessThanOrEqual(22);
@@ -169,9 +167,7 @@ async function solve(page: Page) {
 }
 test("builds a plan through Canvas/native input and clears the original stage", async ({
 	page,
-}, info) => {
-	// The complete editor path includes many native input/render round trips on software WebGL.
-	test.setTimeout(120000);
+}) => {
 	const errors: string[] = [];
 	page.on("pageerror", (e) => errors.push(e.message));
 	await open(page);
@@ -194,9 +190,16 @@ test("builds a plan through Canvas/native input and clears the original stage", 
 		)
 		.toContain("Step 2 から開放");
 	expect(errors).toEqual([]);
-	await page.screenshot({
-		path: `test-results/clear-${info.project.name}.png`,
-	});
+});
+test("paints after editor-map-log cache target reuse", async ({ page }, info) => {
+	// Software GPU readback has a separate budget from the interaction suite.
+	test.setTimeout(180000);
+	await open(page);
+	await add(page, "方向へ移動", { 方向: "→ 右", マス数: "2" });
+	await tab(page, "マップ");
+	await tab(page, "ログ");
+	await assertTabPaint(page, "ログ");
+	await page.screenshot({ path: `test-results/canvas-${info.project.name}.png` });
 });
 test("pauses, single-steps and keeps edits separate from the running snapshot", async ({
 	page,
@@ -260,7 +263,6 @@ test("Conflict rolls back both people and log selection highlights the command",
 test("reorders/deletes, validates integers and supports every condition", async ({
 	page,
 }) => {
-	test.setTimeout(120000);
 	await open(page);
 	await add(page, "ステップ数で待機", { 待機するステップ数: "2" });
 	await add(page, "方向へ移動", { 方向: "→ 右", マス数: "1" });
