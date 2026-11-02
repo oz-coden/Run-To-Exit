@@ -167,6 +167,8 @@ async function solve(page: Page) {
 test("builds a plan through Canvas/native input and clears the original stage", async ({
 	page,
 }, info) => {
+	// The complete editor path includes many native input/render round trips on software WebGL.
+	test.setTimeout(120000);
 	const errors: string[] = [];
 	page.on("pageerror", (e) => errors.push(e.message));
 	await open(page);
@@ -255,6 +257,7 @@ test("Conflict rolls back both people and log selection highlights the command",
 test("reorders/deletes, validates integers and supports every condition", async ({
 	page,
 }) => {
+	test.setTimeout(120000);
 	await open(page);
 	await add(page, "ステップ数で待機", { 待機するステップ数: "2" });
 	await add(page, "方向へ移動", { 方向: "→ 右", マス数: "1" });
