@@ -460,7 +460,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-person]").forEach((b) =>
     signal: shutdown.signal,
   }),
 );
-const game = new Game({
+export const game = new Game({
   parent: $("board"),
   resolution: { width: 640, height: 448 },
   maxDelta: 0.25,

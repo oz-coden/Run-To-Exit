@@ -1,14 +1,22 @@
 # Simpludify公開npm SDKの利用レビュー
 
-対象: **`@simpludify/core@0.1.1` / `@simpludify/web@0.1.1`**。エンジン本体を変更せず、npmパッケージの公開exportのみを使う。
+対象: **`@simpludify/core@0.1.2` / `@simpludify/web@0.1.2`**。エンジン本体を変更せず、npmパッケージの公開exportのみを使う。
 
 ## 利用結果と責務
 
-Grid、Tilemap / SpriteSheet、Actor / Transform / Renderable、Game / Scene、CanvasButton / Row / Column / Label / Panel、PointerClick、defineEvent、setViewport、presentationTweens / Tween.bind / Easing、非同期起動とdisposeを利用する。従来の地形描画と入力は同じ公開APIで移行できた。WebのCore依存は完全固定0.1.1で、ゲーム側のCoreと重複しない。
+Grid、Tilemap / SpriteSheet、Actor / Transform / Renderable、Game / Scene、CanvasButton / Row / Column / Label / Panel、PointerClick、defineEvent、bindViewport、presentationTweens / Tween.bind / Easing、非同期起動とdisposeを利用する。従来の地形描画と入力は同じ公開APIで移行できた。WebのCore依存は完全固定0.1.2で、ゲーム側のCoreと重複しない。
 
 整数ステップ、同時移動、占有、Conflict時の全体ロールバック、命令スナップショット、経路探索、設備予約、ログはゲームの純粋モデルに残す。物理Collider、秒単位Timer、Tweenに離散世界の規則を担当させない。Tweenは確定済みWorld間の表示だけを補間する。
 
-## 具体的な改善候補
+## v0.1.2での改善結果
+
+npmレジストリからCore/Webをv0.1.2へ更新し、World用のCanvasPanelを`Game.bindViewport()`でViewportへ接続する。Board専用のResizeObserverと固定64/96pxの余白計算を除去し、Boardは18行削除・5行追加（正味13行減）となる。Canvas UIの高さを100%とし、World領域は`pointerEvents: "none"`でマップ入力を遮らない。
+
+本番エントリのGameをESM exportとして保持し、ブラウザ検証は実際の公開worldToScreen APIから座標を取得する。Viewportの定数コピーやwindowへの検証専用グローバルは使用しない。整数ステップ、Conflictと命令実行のモデルは変更しない。
+
+## v0.1.1利用時の改善候補（履歴）
+
+以下はv0.1.1移行時に記録した制約と回避策。Viewport連動、配布READMEの整合性、独立スターターはその後のSDK整備で対応した。
 
 ### 1. npm向け最小テンプレートと配布READMEの整合性
 
