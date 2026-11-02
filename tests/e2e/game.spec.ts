@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import type { CanvasNode } from "@simpludify/web";
 type Puzzle = typeof import("../../src/main");
+const activeTabs = new WeakMap<Page, string>();
 declare global {
 	interface Window {
 		puzzle: Puzzle;
@@ -46,6 +47,7 @@ async function open(page: Page) {
 	await expect
 		.poll(() => page.evaluate(() => window.puzzle.screen.root.bounds.width))
 		.toBeGreaterThan(0);
+	activeTabs.set(page, "マップ");
 }
 async function text(page: Page, name: keyof Puzzle["screen"]) {
 	return page.evaluate(
@@ -81,8 +83,11 @@ async function activate(page: Page, name: string) {
 	await page.clock.runFor(32);
 }
 async function tab(page: Page, name: string) {
+	const changed = activeTabs.get(page) !== name;
 	await page.getByRole("button", { name, exact: true }).press("Enter");
 	await page.clock.runFor(32);
+	activeTabs.set(page, name);
+	if (!changed) return;
 	// A semantic mirror can remain usable while a recycled GPU cache paints blank.
 	const pixel = await page.evaluate((name) => {
 		const { game, screen } = window.puzzle;
@@ -91,16 +96,13 @@ async function tab(page: Page, name: string) {
 		const canvas = game.element.querySelector("canvas");
 		if (!node || !canvas) throw Error("Missing tab paint target");
 		const copy = document.createElement("canvas");
-		copy.width = canvas.width;
-		copy.height = canvas.height;
+		copy.width = copy.height = 1;
 		const context = copy.getContext("2d");
 		if (!context) throw Error("Missing pixel reader");
-		context.drawImage(canvas, 0, 0);
-		return [...context.getImageData(
-			Math.round((node.bounds.x + 8) * screen.ui.scale * canvas.width / game.element.clientWidth),
-			Math.round((node.bounds.y + 8) * screen.ui.scale * canvas.height / game.element.clientHeight),
-			1, 1,
-		).data];
+		const x = Math.round((node.bounds.x + 8) * screen.ui.scale * canvas.width / game.element.clientWidth);
+		const y = Math.round((node.bounds.y + 8) * screen.ui.scale * canvas.height / game.element.clientHeight);
+		context.drawImage(canvas, x, y, 1, 1, 0, 0, 1, 1);
+		return [...context.getImageData(0, 0, 1, 1).data];
 	}, name);
 	expect(pixel[3]).toBe(255);
 	for (const [channel, expected] of [0x41, 0x6c, 0x76].entries())
