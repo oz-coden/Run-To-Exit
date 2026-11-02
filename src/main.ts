@@ -1,7 +1,7 @@
 import {
   CanvasButton, CanvasColumn, CanvasLabel, CanvasPanel, CanvasRow,
   CanvasScroll, CanvasSelect, CanvasTextInput, Game,
-  type CanvasNode, type CanvasStyle, type CanvasUI,
+  type CanvasNode, type CanvasStyle, type CanvasUI, type SceneContext,
 } from "@simpludify/web";
 import { Board } from "./board";
 import {
@@ -11,6 +11,13 @@ import {
 import { collisionExample, solution, stage } from "./stage";
 import "./style.css";
 
+export const game = new Game({
+  parent: document.querySelector<HTMLElement>("#app")!, resolution: { width: 640, height: 448 }, maxDelta: 0.25,
+  tokens: { background: "#101f2a" }, onError: e => screen?.runNote.setText(`ゲームの起動または描画に失敗しました：${String(e)}`),
+});
+export let screen: ReturnType<typeof createScreen>;
+game.scene("puzzle", context => { screen = createScreen(context); });
+function createScreen(context: SceneContext) {
 const colors = { surface: 0x192e3c, raised: 0x254151, accent: 0x416c76, text: 0xe4eeee, muted: 0xa9c3cd };
 const small: CanvasStyle = { fontSize: 14, color: colors.muted, shrink: 0 };
 const control: CanvasStyle = { fontSize: 15, minHeight: 44, padding: 10, background: colors.raised, shrink: 0 };
@@ -22,6 +29,7 @@ const choose = <T extends string>(name: string, options: readonly (readonly [T, 
 );
 let draft: Plan = emptyPlan(stage), selected = "A", run: Run | null = null;
 let playing = false, accumulator = 0, board: Board | undefined, ui: CanvasUI;
+let pendingFocus: CanvasNode | undefined;
 let highlighted: { actor: string; index: number } | null = null;
 let selectedLog: LogEntry | undefined;
 let tab = "map", compact = false, logPage = 0;
@@ -39,8 +47,9 @@ const play = button("▶ 再生開始", () => {
 const step = button("1 ステップ →", () => { playing = false; accumulator = 0; takeStep(); });
 const restart = button("↻ 再実行", () => { newRun(); playing = true; renderStatus(); });
 const speed = choose("再生速度", [["0.5", "0.5×"], ["1", "1×"], ["2", "2×"], ["4", "4×"]], "1");
+speed.setStyle({ width: 0, grow: 1, minWidth: 0 });
 speed.onChange(() => { accumulator = 0; });
-const region = CanvasPanel([], { grow: 1, minHeight: 180, pointerEvents: "none" });
+const region = CanvasPanel([], { grow: 1, minHeight: 100, pointerEvents: "none" });
 const mapPanel = CanvasColumn([
   label("01 / ふたつの合図", { fontSize: 20, color: colors.text }),
   label("S1とS2を同時に操作 → ゲート開放6ステップ"),
@@ -48,7 +57,7 @@ const mapPanel = CanvasColumn([
   CanvasRow([play, step, restart], { gap: 6, wrap: true, shrink: 0 }),
   CanvasRow([label("速度", { alignSelf: "center" }), speed], { gap: 8, shrink: 0 }),
   runNote, outcome,
-], { gap: 8, padding: 12, background: colors.surface, grow: 1, minWidth: 0 });
+], { gap: 8, padding: 12, grow: 1, minWidth: 0 });
 
 const kind = choose("追加する命令", [["move", "方向へ移動"], ["go", "座標まで自動移動"], ["interact", "設備を操作"], ["wait", "ステップ数で待機"], ["until", "条件が成立するまで待機"]], "move");
 const direction = choose<Direction>("方向", [["up", "↑ 上"], ["right", "→ 右"], ["down", "↓ 下"], ["left", "← 左"]], "up");
@@ -182,7 +191,7 @@ function renderCommands(): void {
           highlighted = null; renderCommands(); renderStatus();
           const at = Math.max(0, Math.min(commandRows.length - 1, index + delta));
           const focus = commandRows[at]?.actions.find(n => n.enabled) ?? add;
-          ui.focus(focus);
+          pendingFocus = focus;
         }, { grow: 1, padding: 6, fontSize: 12, minWidth: 0 });
         action.enabled = !(delta === -1 && index === 0) && !(delta === 1 && index === draft[selected].length - 1);
         return action;
@@ -194,19 +203,31 @@ function renderCommands(): void {
   }
   for (const [index, row] of commandRows.entries()) {
     const active = run && JSON.stringify(run.plan[selected]?.[index]) === JSON.stringify(row.command) && world().people.find(p => p.id === selected)?.pc === index;
-    row.row.setStyle({ background: highlighted?.actor === selected && highlighted.index === index ? 0x685237 : active ? 0x345f63 : colors.raised });
+    row.row.setStyle({ background: highlighted?.actor === selected && highlighted.index === index && run && JSON.stringify(run.plan[selected]?.[index]) === JSON.stringify(row.command) ? 0x685237 : active ? 0x345f63 : colors.raised });
   }
   peopleButtons.forEach((node, i) => node.setStyle({ background: stage.people[i].id === selected ? colors.accent : colors.raised }));
 }
 let snapshotPlan: Plan | undefined;
 let snapshotRendered = false;
+let snapshotRows: {actor: string; index: number; node: CanvasNode}[] = [];
 function renderSnapshot(): void {
   if (!snapshotOpen) return;
   if (!snapshotRendered || snapshotPlan !== run?.plan) {
     snapshotRendered = true;
-    snapshot.clear(); snapshotPlan = run?.plan;
+    snapshot.clear(); snapshotRows = []; snapshotPlan = run?.plan;
     if (!run) snapshot.add(label("再生開始時に計画を固定します。"));
-    else for (const person of stage.people) snapshot.add(label(`${person.id} ${person.name}\n${run.plan[person.id].map((c, i) => `${i + 1}. ${commandText(c)}`).join("\n") || "命令なし"}`));
+    else for (const person of stage.people) {
+      snapshot.add(label(`${person.id} ${person.name}`));
+      for (const [index, c] of run.plan[person.id].entries()) {
+        const node = label(`${index + 1}. ${commandText(c)}`);
+        snapshot.add(node); snapshotRows.push({actor: person.id, index, node});
+      }
+    }
+  }
+  for (const row of snapshotRows) {
+    const chosen = highlighted?.actor === row.actor && highlighted.index === row.index;
+    const active = world().people.find(p => p.id === row.actor)?.pc === row.index;
+    row.node.setStyle({ color: chosen ? 0xffd28c : active ? 0x95e2c2 : colors.muted });
   }
 }
 function renderStatus(): void {
@@ -246,7 +267,8 @@ function focusLog(entry: LogEntry): void {
   selectedLog = entry;
   if (entry.actors[0]) select(entry.actors[0]);
   highlighted = entry.actors[0] && entry.command !== undefined ? { actor: entry.actors[0], index: entry.command } : null;
-  renderCommands(); board?.focus(entry.cells); renderLog();
+  snapshotOpen = true; snapshot.visible = true; snapshotToggle.setText("現在実行中の計画を隠す");
+  renderCommands(); renderSnapshot(); board?.focus(entry.cells); renderLog();
   // The fixed snapshot remains the authoritative instruction when the draft has changed.
   if (entry.command !== undefined) runNote.setText(`Step ${entry.step}：${entry.text} / 実行時の命令 ${entry.command + 1}。編集中の計画とは別の記録です。`);
 }
@@ -260,15 +282,15 @@ function takeStep(): void {
   board?.sync(run.state, true, 0.25 / Number(speed.value)); board?.focus(run.conflict?.cells);
   renderStatus(); renderLog();
 }
-export const game = new Game({
-  parent: document.querySelector<HTMLElement>("#app")!, resolution: { width: 640, height: 448 }, maxDelta: 0.25,
-  tokens: { background: "#101f2a" }, onError: e => { playing = false; runNote.setText(`ゲームの起動または描画に失敗しました：${String(e)}`); },
-});
-game.scene("puzzle", context => {
+
   ui = context.canvasUI(root); game.bindViewport(ui, region);
   board = new Board(game, context, stage, initial, select, pick);
   board.select(selected); board.focus(); renderStatus(); renderLog(); responsive();
   context.onUpdate(seconds => {
+    if (pendingFocus && pendingFocus.bounds.width > 0) {
+      const node = pendingFocus; pendingFocus = undefined;
+      if (node.available) ui.focus(node);
+    }
     const narrow = root.bounds.width < 850;
     if (narrow !== compact) { compact = narrow; responsive(); }
     if (!playing) return;
@@ -278,15 +300,15 @@ game.scene("puzzle", context => {
       if (world().step >= 200) { playing = false; renderStatus(); runNote.setText("200ステップに到達して一時停止。1ステップ操作は続けられます。"); }
     }
   });
-});
-await game.run("puzzle");
-if (import.meta.hot) import.meta.hot.dispose(() => game.dispose());
-
 /** Inspectable public Canvas nodes for embedding and behavioral regression checks. */
-export const screen = {
+return {
   root, region, mapPanel, editor, logs, help, status, runNote, outcome, gate, positions,
   draftBadge, error, target, commands, snapshot, logItems, logScroll, logRange,
   play, step, restart, speed, kind, direction, moveCount, x, y, waitCount, cx, cy,
   device, condition, conditionPosition, add, filter, previous, next, tabs, peopleButtons,
   get ui() { return ui; },
 };
+
+}
+await game.run("puzzle");
+if (import.meta.hot) import.meta.hot.dispose(() => game.dispose());

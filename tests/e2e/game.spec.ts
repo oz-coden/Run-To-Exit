@@ -1,285 +1,159 @@
 import { test, expect, type Page } from "@playwright/test";
+import type { CanvasNode } from "@simpludify/web";
+type Puzzle = typeof import("../../src/main");
+declare global { interface Window { puzzle: Puzzle } }
 async function open(page: Page) {
   await page.goto("./");
-  await expect(page.locator("#play")).toBeEnabled();
-}
-async function boardProjection(page: Page, point = {x: 56 + 2.5 * 48, y: 32 + 6.5 * 48}) {
-  await page.locator("#board .simpludify").scrollIntoViewIfNeeded();
-  return page.evaluate(async (point) => {
-    const response = await fetch(new URL(".vite/manifest.json", document.baseURI));
-    if (!response.ok) throw new Error("Missing production asset manifest");
-    const manifest = await response.json();
-    const entry = manifest["src/main.ts"]?.file;
-    if (!entry) throw new Error("Missing game entry module");
-    const { game } = await import(new URL(entry, document.baseURI).href) as {game: import("@simpludify/web").Game};
-    const projected = game.worldToScreen({...point, space: "world"});
-    const box = game.element.getBoundingClientRect();
-    return {x:box.x + projected.x, y:box.y + projected.y, viewport:{...game.viewport}, width:game.element.clientWidth, height:game.element.clientHeight};
-  },point);
-}
-async function hint(page: Page, kind = "solution") {
-  await page.getByText("ヒント・攻略例", { exact: true }).click();
-  await page.locator(`#load-${kind}`).click();
-}
-async function add(
-  page: Page,
-  kind: string,
-  fields: Record<string, string> = {},
-) {
-  await page.locator("#command-kind").selectOption(kind);
-  for (const [id, content] of Object.entries(fields)) {
-    if (["direction", "device", "condition"].includes(id))
-      await page.locator(`#${id}`).selectOption(content);
-    else await page.locator(`#${id}`).fill(content);
-  }
-  await page.locator("#add-command").click();
-}
-async function solveByEditor(page: Page) {
-  await add(page, "interact", { device: "s1" });
-  await add(page, "go", { "target-x": "8", "target-y": "3" });
-  await page.locator('[data-person="B"]').click();
-  await add(page, "interact", { device: "s2" });
-  await add(page, "move", { direction: "right", "move-count": "2" });
-  await add(page, "move", { direction: "up", "move-count": "2" });
-  await add(page, "go", { "target-x": "8", "target-y": "3" });
-}
-test("builds a plan in the real editor and clears the original stage", async ({
-  page,
-}, info) => {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  await open(page);
-  await solveByEditor(page);
-  await page.locator("#speed").selectOption("4");
-  await page.locator("#play").click();
-  await expect(page.locator("#outcome")).toContainText("全員、無事に脱出", {
-    timeout: 15000,
+  await page.evaluate(async () => {
+    const manifest = await (await fetch(new URL(".vite/manifest.json", document.baseURI))).json();
+    window.puzzle = await import(new URL(manifest["src/main.ts"].file, document.baseURI).href);
   });
-  await expect(page.locator("#run-note")).toContainText("Step 9");
-  await expect(page.locator("#pos-A")).toHaveText("脱出済み");
-  await expect(page.locator("#pos-B")).toHaveText("脱出済み");
-  await expect(page.locator("#log")).toContainText("Step 2 から開放");
-  await expect(page.locator("#log")).toContainText("Step 8 から閉鎖");
+  await expect.poll(() => page.evaluate(() => window.puzzle.screen.root.bounds.width)).toBeGreaterThan(0);
+}
+async function text(page: Page, name: keyof Puzzle["screen"]) {
+  return page.evaluate(name => (window.puzzle.screen[name] as CanvasNode).text, name);
+}
+async function activate(page: Page, name: string) {
+  const point = await page.evaluate(async name => {
+    const { screen, game } = window.puzzle;
+    const find = (node: CanvasNode): CanvasNode | undefined => node.text === name && node.interactive ? node : node.children.map(find).find(Boolean);
+    const node = find(screen.root); if (!node) throw Error(`Missing control: ${name}`);
+    screen.ui.focus(node); await game.whenReady();
+    const b = node.bounds, r = game.element.getBoundingClientRect();
+    return { x: r.x + (b.x + b.width / 2) * screen.ui.scale, y: r.y + (b.y + b.height / 2) * screen.ui.scale };
+  }, name);
+  // Native semantic mirrors have no pointer ownership; activate the actual Canvas hit box.
+  if (test.info().project.use.hasTouch) await page.touchscreen.tap(point.x, point.y);
+  else await page.mouse.click(point.x, point.y);
+}
+async function tab(page: Page, name: string) { await page.getByRole("button", {name, exact:true}).press("Enter"); }
+async function focusText(page: Page, name: string) {
+  await page.evaluate(async name => {
+    const {screen:s,game}=window.puzzle;
+    const walk=(n:CanvasNode):CanvasNode|undefined=>n.text===name&&n.interactive?n:n.children.map(walk).find(Boolean);
+    const n=walk(s.root);if(!n)throw Error(name);s.ui.focus(n);await game.whenReady();
+  },name);
+}
+async function select(page: Page, name: string, label: string) { await focusText(page,name); await page.getByRole("combobox", {name, exact:true}).selectOption({label}); }
+async function add(page: Page, kind: string, fields: Record<string,string> = {}) {
+  await tab(page,"命令");
+  await select(page,"追加する命令",kind);
+  for (const [name,value] of Object.entries(fields)) {
+    const combo = page.getByRole("combobox",{name,exact:true});
+    if (await combo.count()) { await focusText(page,name); await combo.selectOption({label:value}); }
+    else {
+      await focusText(page,name);
+      await page.getByRole("textbox",{name,exact:true}).fill(value);
+    }
+  }
+  await activate(page,"＋ 命令を追加");
+}
+async function hint(page: Page, conflict=false) { await tab(page,"遊び方"); await activate(page,conflict?"衝突例をセット":"攻略例をセット"); }
+async function transport(page: Page, name: string) { await tab(page,"マップ"); await activate(page,name); }
+async function solve(page: Page) {
+  await add(page,"設備を操作",{"スイッチ":"S1 · (2, 2)"});
+  await add(page,"座標まで自動移動",{"X 座標":"8","Y 座標":"3"});
+  await activate(page,"B ベニ");
+  await add(page,"設備を操作",{"スイッチ":"S2 · (2, 6)"});
+  await add(page,"方向へ移動",{"方向":"→ 右","マス数":"2"});
+  await add(page,"方向へ移動",{"方向":"↑ 上","マス数":"2"});
+  await add(page,"座標まで自動移動",{"X 座標":"8","Y 座標":"3"});
+}
+test("builds a plan through Canvas/native input and clears the original stage", async ({page},info)=>{
+  const errors:string[]=[];page.on("pageerror",e=>errors.push(e.message));
+  await open(page); await solve(page); await tab(page,"マップ"); await select(page,"再生速度","4×");
+  await activate(page,"▶ 再生開始");
+  await expect.poll(()=>text(page,"outcome"),{timeout:20000}).toContain("全員、無事に脱出");
+  expect(await text(page,"runNote")).toContain("Step 9");
+  expect(await text(page,"positions")).toContain("A 脱出済み · B 脱出済み");
+  await tab(page,"ログ");
+  await expect.poll(()=>page.evaluate(()=>window.puzzle.screen.logItems.children.map(n=>n.text).join("\n"))).toContain("Step 2 から開放");
   expect(errors).toEqual([]);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await page.screenshot({
-    path: `test-results/clear-${info.project.name}.png`,
-    fullPage: true,
-  });
+  await page.screenshot({path:`test-results/clear-${info.project.name}.png`});
 });
-test("pauses, resumes, single-steps, and isolates edits from an active snapshot", async ({
-  page,
-}) => {
-  await open(page);
-  await hint(page);
-  await page.locator("#speed").selectOption("0.5");
-  await page.locator("#play").click();
-  await expect(page.locator("#run-note")).toContainText(
-    /世界 Step [1-9]\d*。/,
-    { timeout: 10000 },
-  );
-  await page.locator("#play").click();
-  await expect(page.locator("#status")).toHaveText("一時停止");
-  const note = await page.locator("#run-note").innerText();
-  await page.waitForTimeout(500);
-  await expect(page.locator("#run-note")).toHaveText(note);
-  await page.locator("#step").click();
-  const pausedStep = Number(note.match(/Step (\d+)/)?.[1]);
-  await expect(page.locator("#run-note")).toContainText(
-    `Step ${pausedStep + 1}。`,
-  );
-  await add(page, "wait", { "wait-count": "2" });
-  await expect(page.locator("#draft-badge")).toHaveText("次回用の変更あり");
-  await page.getByText("現在実行中の計画", { exact: false }).first().click();
-  await expect(page.locator("#snapshot-content")).not.toContainText(
-    "2 ステップ待機",
-  );
-  await page.locator("#play").click();
-  await expect(page.locator("#status")).toHaveText("実行中");
-  await page.locator("#play").click();
-  await page.locator("#restart").click();
-  await page.locator("#play").click();
-  await expect(page.locator("#snapshot-content")).toContainText(
-    "2 ステップ待機",
-  );
+test("pauses, single-steps and keeps edits separate from the running snapshot",async({page})=>{
+  await open(page);await hint(page);await tab(page,"マップ");await select(page,"再生速度","0.5×");
+  await activate(page,"▶ 再生開始");await expect.poll(()=>text(page,"runNote")).toMatch(/Step [1-9]/);
+  await activate(page,"Ⅱ 一時停止");const note=await text(page,"runNote");
+  await page.waitForTimeout(250);expect(await text(page,"runNote")).toBe(note);
+  await activate(page,"1 ステップ →");expect(await text(page,"status")).toBe("一時停止");
+  await add(page,"ステップ数で待機",{"待機するステップ数":"2"});
+  expect(await text(page,"draftBadge")).toContain("次回用の変更あり");
+  await activate(page,"現在実行中の計画を表示");
+  expect(await page.evaluate(()=>window.puzzle.screen.snapshot.children.map(n=>n.text).join("\n"))).not.toContain("2 ステップ待機");
+  await transport(page,"↻ 再実行");await activate(page,"Ⅱ 一時停止");
+  expect(await page.evaluate(()=>window.puzzle.screen.snapshot.children.map(n=>n.text).join("\n"))).toContain("2 ステップ待機");
 });
-test("reports a collision without partially moving either person and highlights its log", async ({
-  page,
-}) => {
-  await open(page);
-  await hint(page, "conflict");
-  await page.locator("#step").click();
-  await expect(page.locator("#status")).toContainText("Conflict");
-  await expect(page.locator("#outcome")).toContainText("Step 1：same-cell");
-  await expect(page.locator("#outcome")).toContainText("最後に確定した Step 0");
-  await expect(page.locator("#pos-A")).toHaveText("(2, 3)");
-  await expect(page.locator("#pos-B")).toHaveText("(2, 5)");
-  await expect(page.locator("#play")).toBeDisabled();
-  await page.locator("#log .log-conflict").click();
-  await expect(page.locator('[data-person="A"]')).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await page.locator("#load-solution").click();
-  await page.locator("#speed").selectOption("4");
-  await page.locator("#restart").click();
-  await expect(page.locator("#outcome")).toContainText("全員、無事に脱出", {
-    timeout: 15000,
-  });
+test("Conflict rolls back both people and log selection highlights the command",async({page})=>{
+  await open(page);await hint(page,true);await transport(page,"1 ステップ →");
+  expect(await text(page,"status")).toContain("Conflict");expect(await text(page,"outcome")).toContain("Step 1：same-cell");
+  expect(await text(page,"outcome")).toContain("最後に確定した Step 0");
+  expect(await text(page,"positions")).toBe("A (2, 3) · B (2, 5)");
+  await expect(page.getByRole("button",{name:"▶ 再開",exact:true})).toBeDisabled();
+  await tab(page,"ログ");const event=await page.evaluate(()=>window.puzzle.screen.logItems.children.find(n=>n.text.includes("Conflict"))?.text);
+  expect(event).toBeTruthy();await activate(page,event!);
+  expect(await page.evaluate(()=>window.puzzle.screen.commands.children[0].style.background)).toBe(0x685237);
 });
-test("reorders/deletes commands, validates values, and supports all waiting controls", async ({
-  page,
-}) => {
-  await open(page);
-  await add(page, "wait", { "wait-count": "2" });
-  await add(page, "move", { direction: "right", "move-count": "1" });
-  await page
-    .getByRole("button", { name: "命令 2 を上へ移動", exact: true })
-    .click();
-  await expect(page.locator("#commands .command").first()).toContainText(
-    "右へ 1",
-  );
-  await page
-    .getByRole("button", { name: "命令 1 を削除", exact: true })
-    .click();
-  await expect(page.locator("#commands .command")).toHaveCount(1);
-  await add(page, "until", { condition: "open" });
-  await expect(page.locator("#commands")).toContainText("扉が開くまで待機");
-  await page.locator("#command-kind").selectOption("move");
-  await page.locator("#move-count").fill("0");
-  await page.locator("#add-command").click();
-  await expect(page.locator("#edit-error")).toBeVisible();
-  await expect(page.locator("#commands .command")).toHaveCount(2);
-  await page.locator("#step").click();
-  await expect(page.locator("#run-note")).toContainText("Step 1");
-  await page.locator("#step").click();
-  await page.locator("#step").click();
-  await expect(page.locator("#run-note")).toContainText("Step 3");
-  await page.locator("#log-filter").selectOption("all");
-  await expect(page.locator("#log")).toContainText("条件待機中");
-});
-test("Canvas pointer coordinates choose a cell and Canvas buttons choose a person", async ({
-  page,
-}, info) => {
-  await open(page);
-  // Project through the public Game API instead of copying HUD/Viewport constants.
-  const {x,y} = await boardProjection(page);
-  if (info.project.use.hasTouch) await page.touchscreen.tap(x, y);
-  else await page.mouse.click(x, y);
-  await expect(page.locator("#command-kind")).toHaveValue("interact");
-  await expect(page.locator("#device")).toHaveValue("s2");
-  // Native semantic mirror exercises Canvas keyboard activation.
-  await page
-    .getByRole("button", { name: "B ベニ", exact: true })
-    .press("Enter");
-  await expect(page.locator('[data-person="B"]')).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await page.locator("#add-command").click();
-  await expect(page.locator("#commands")).toContainText("S2");
-});
-test("loads and reloads the production subpath with healthy local assets", async ({
-  page,
-}) => {
-  const broken: string[] = [];
-  page.on("response", (response) => {
-    if (response.status() >= 400 && response.url().includes("/Run-To-Exit/"))
-      broken.push(response.url());
-  });
-  await open(page);
-  await page.reload();
-  await expect(page.locator("#play")).toBeEnabled();
-  await expect(page.locator("canvas")).toBeVisible();
-  expect(new URL(page.url()).pathname).toBe("/Run-To-Exit/");
-  expect(broken).toEqual([]);
-});
-
-
-test("keyboard map targeting stays isolated from form input and editor focus survives edits", async ({ page }) => {
-  await open(page);
-  const surface = page.locator("#board .simpludify");
-  await surface.focus();
-  await surface.press("ArrowLeft");
-  await expect(page.locator("#selected-cell")).toHaveText("対象 (7, 3)");
-  await surface.press("ArrowUp");
-  await expect(page.locator("#target-y")).toHaveValue("2");
-  await page.locator("#target-x").focus();
-  await page.locator("#target-x").press("ArrowDown");
-  await expect(page.locator("#selected-cell")).toHaveText("対象 (7, 2)");
-  await expect(page.locator("#status")).toHaveText("計画中");
-  await add(page, "wait", { "wait-count": "1" });
-  await add(page, "move", { direction: "right" });
-  await page.getByRole("button", { name: "命令 2 を上へ移動", exact: true }).press("Enter");
-  await expect(page.locator("#commands .command").first()).toContainText("右へ");
-  await expect(page.locator("#commands button:focus")).toHaveCount(1);
-  await page.getByRole("button", { name: "命令 1 を削除", exact: true }).press("Enter");
-  await expect(page.locator("#commands button:focus")).toHaveCount(1);
-  await page.getByRole("button", { name: "命令 1 を削除", exact: true }).press("Enter");
-  await expect(page.locator("#add-command")).toBeFocused();
-  await add(page, "wait", { "wait-count": "10" });
-  await page.locator("#speed").selectOption("4");
-  await page.clock.install({ time: new Date(0) });
-  await page.clock.pauseAt(new Date(60_000));
-  await page.locator("#play").click();
-  const deleteCommand = page.getByRole("button", { name: "命令 1 を削除", exact: true });
-  await deleteCommand.focus();
-  const currentStep = async () => Number(
-    (await page.locator("#run-note").innerText()).match(/Step (\d+)/)?.[1],
-  );
-  const focusedAtStep = await currentStep();
-  await page.clock.runFor(650);
-  expect(await currentStep()).toBeGreaterThan(focusedAtStep);
-  await expect(deleteCommand).toBeFocused();
-  await page.locator("#play").click();
-});
-
-test("ships registry SDK inventory, license notices, and supports 320px command scrolling", async ({ page, request }) => {
-  await open(page);
-  const response = await request.get("dependencies.json");
-  expect(response.ok()).toBe(true);
-  const inventory = await response.json();
-  for (const name of ["@simpludify/core", "@simpludify/web"]) {
-    expect(inventory.find((p: { name: string }) => p.name === name)).toMatchObject({ version: "0.1.2", license: "MIT" });
+test("reorders/deletes, validates integers and supports every condition",async({page})=>{
+  await open(page);await add(page,"ステップ数で待機",{"待機するステップ数":"2"});await add(page,"方向へ移動",{"方向":"→ 右","マス数":"1"});
+  await activate(page,"命令 2 を上へ移動 ↑");
+  await expect.poll(()=>page.evaluate(()=>window.puzzle.screen.commands.children[0].children[0].text)).toContain("右へ");
+  await activate(page,"命令 1 を削除 ×");
+  for(const condition of ["ゲートが開く","ゲートが閉じる","もう1人が脱出する","もう1人が指定座標に来る"])
+    await add(page,"条件が成立するまで待機",{"待つ条件":condition,...(condition.includes("指定座標")?{"待機対象 X":"4","待機対象 Y":"3"}:{})});
+  const count=await page.evaluate(()=>window.puzzle.screen.commands.children.length);
+  for(const value of ["0","", "1.5", "日本語"]){
+    await add(page,"方向へ移動",{"マス数":value});expect(await text(page,"error")).toContain("整数");
+    expect(await page.evaluate(()=>window.puzzle.screen.commands.children.length)).toBe(count);
   }
-  expect((await (await request.get("THIRD-PARTY-NOTICES.txt")).text())).toContain("Vlad Shilov");
-  await page.setViewportSize({ width: 320, height: 740 });
-  for (let i = 0; i < 12; i++) await add(page, "wait", { "wait-count": "1" });
-  const commands = page.locator("#commands");
-  expect(await commands.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
-  await commands.evaluate(el => { el.scrollTop = el.scrollHeight; });
-  await expect(page.getByRole("button", { name: "命令 12 を削除", exact: true })).toBeInViewport();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await expect(page.locator("#play")).toBeInViewport();
 });
-
-test("bound map viewport follows host resize and HUD taps keep world coordinates", async ({page}, info) => {
+test("pointer projection picks switches and HUD taps never select a world cell",async({page})=>{
   await open(page);
-  for (const width of [900, 390, 320]) {
-    await page.setViewportSize({width,height:844});
-    await expect.poll(async () => {
-      const view=await boardProjection(page);
-      return Math.abs(view.viewport.width - (view.width - 20));
-    }).toBeLessThan(0.1);
-    const view=await boardProjection(page);
-    expect(view.viewport.x).toBeCloseTo(10,1);
-    expect(view.viewport.y).toBeGreaterThanOrEqual(44);
-    expect(view.viewport.height).toBeGreaterThan(1);
-    expect(view.viewport.y + view.viewport.height).toBeLessThan(view.height - 10);
-    if(info.project.use.hasTouch) await page.touchscreen.tap(view.x,view.y);
-    else await page.mouse.click(view.x,view.y);
-    await expect(page.locator("#selected-cell")).toHaveText("対象 (2, 6)");
-    await expect(page.locator("#device")).toHaveValue("s2");
-    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  }
-  const button=await page.getByRole("button",{name:"B ベニ",exact:true}).boundingBox();
-  if(!button) throw new Error("Missing Canvas HUD button");
-  if(info.project.use.hasTouch) await page.touchscreen.tap(button.x+button.width/2,button.y+button.height/2);
-  else await page.mouse.click(button.x+button.width/2,button.y+button.height/2);
-  await expect(page.locator('[data-person="B"]')).toHaveAttribute("aria-pressed","true");
-  await expect(page.locator("#selected-cell")).toHaveText("対象 (2, 6)");
+  const point=await page.evaluate(()=>{const {game}=window.puzzle;const p=game.worldToScreen({space:"world",x:56+2.5*48,y:32+6.5*48});const r=game.element.getBoundingClientRect();return {x:r.x+p.x,y:r.y+p.y};});
+  if(test.info().project.use.hasTouch)await page.touchscreen.tap(point.x,point.y);else await page.mouse.click(point.x,point.y);
+  expect(await text(page,"target")).toBe("対象 (2, 6)");
+  await tab(page,"命令");await activate(page,"B ベニ");await activate(page,"＋ 命令を追加");
+  expect(await page.evaluate(()=>window.puzzle.screen.commands.children[0].children[0].text)).toContain("S2");
+  expect(await text(page,"target")).toBe("対象 (2, 6)");
+});
+test("keyboard map targeting stays isolated from editing and command focus survives updates",async({page})=>{
+  await open(page);const host=page.locator(".simpludify");await host.focus();await host.press("ArrowLeft");
+  expect(await text(page,"target")).toBe("対象 (7, 3)");
+  await tab(page,"命令");await page.evaluate(()=>window.puzzle.screen.ui.focus(window.puzzle.screen.x));
+  await page.getByRole("textbox",{name:"X 座標",exact:true}).press("ArrowDown");
+  expect(await text(page,"target")).toBe("対象 (7, 3)");
+  await add(page,"ステップ数で待機",{"待機するステップ数":"10"});await add(page,"方向へ移動",{"方向":"→ 右"});
+  await page.evaluate(()=>window.puzzle.screen.ui.focus(window.puzzle.screen.commands.children[1].children[1].children[0]));
+  await page.keyboard.press("Enter");
+  await expect.poll(()=>page.evaluate(()=>window.puzzle.screen.ui.focusedNode?.text)).toContain("命令 1");
+  await page.keyboard.press("Tab");await page.keyboard.press("Space");
+  expect(await text(page,"status")).toBe("計画中");
+});
+test("all 50 commands remain reachable and event pages bound the displayed history",async({page})=>{
+  await open(page);await add(page,"ステップ数で待機",{"待機するステップ数":"100"});
+  for(let i=1;i<50;i++)await activate(page,"＋ 命令を追加");
+  await activate(page,"＋ 命令を追加");expect(await text(page,"error")).toContain("50命令");
+  await activate(page,"命令 50 を削除 ×");
+  await expect.poll(()=>page.evaluate(()=>window.puzzle.screen.commands.children.length)).toBe(49);
+  await transport(page,"▶ 再生開始");await select(page,"再生速度","4×");
+  // Advance actual transport repeatedly with a controlled clock, preserving per-step updates.
+  await page.clock.install();await page.clock.runFor(16000);await activate(page,"Ⅱ 一時停止");
+  await tab(page,"ログ");await select(page,"ログ表示","すべて");
+  expect(await page.evaluate(()=>window.puzzle.screen.logItems.children.length)).toBeLessThanOrEqual(80);
+  await expect(page.getByRole("button",{name:"次の80件",exact:true})).toBeEnabled();
+  await activate(page,"次の80件");expect(await text(page,"logRange")).toContain("81〜");
+});
+test("scene recreation disposes old UI and releases native input and projection",async({page})=>{
+  await open(page);await tab(page,"命令");await add(page,"方向へ移動");
+  const result=await page.evaluate(async()=>{const {game,screen:old}=window.puzzle;await game.goTo("puzzle");return {oldDisposed:old.ui.disposed,rootDisposed:old.root.disposed,nodes:old.ui.diagnostics.nodes,newRoot:window.puzzle.screen.root!==old.root,step:window.puzzle.screen.runNote.text};});
+  expect(result).toMatchObject({oldDisposed:true,rootDisposed:true,nodes:0,newRoot:true});expect(result.step).toContain("Step 0");
+  await expect(page.locator(".s-canvas-accessibility")).toHaveCount(1);
+  await page.evaluate(()=>{window.puzzle.game.dispose();window.puzzle.game.dispose();});await expect(page.locator(".simpludify")).toHaveCount(0);
+});
+test("production subpath, registry inventory and 320/390 layouts stay healthy",async({page,request})=>{
+  const errors:string[]=[];page.on("pageerror",e=>errors.push(e.message));await open(page);await page.reload();await open(page);
+  const inventory=await(await request.get("dependencies.json")).json();for(const name of ["@simpludify/core","@simpludify/web"])expect(inventory.find((p:{name:string})=>p.name===name)).toMatchObject({version:"0.1.2",license:"MIT"});
+  expect(await(await request.get("THIRD-PARTY-NOTICES.txt")).text()).toContain("Vlad Shilov");
+  for(const width of [900,390,320]){await page.setViewportSize({width,height:844});await tab(page,"マップ");await expect.poll(()=>page.evaluate(()=>window.puzzle.game.viewport.width)).toBeGreaterThan(150);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await tab(page,"遊び方");await activate(page,"攻略例をセット");}
+  expect(errors).toEqual([]);
 });

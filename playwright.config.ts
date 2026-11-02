@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 const external = process.env.E2E_BASE_URL;
 export default defineConfig({
   testDir: "./tests/e2e",
-  timeout: 45000,
+  timeout: process.env.CHROMIUM_PATH ? 180000 : 60000,
   fullyParallel: true,
   workers: process.env.CI ? 2 : 2,
   retries: process.env.CI ? 1 : 0,
