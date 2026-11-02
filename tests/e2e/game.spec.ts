@@ -162,7 +162,7 @@ test("Canvas pointer coordinates choose a cell and Canvas buttons choose a perso
   // Switch S2 at (2,6); use a real pointer/touch, not application state injection.
   const x = box.x + offsetX + (56 + 2.5 * 48) * scale,
     y = box.y + offsetY + (32 + 6.5 * 48) * scale;
-  if (info.project.name === "narrow") await page.touchscreen.tap(x, y);
+  if (info.project.use.hasTouch) await page.touchscreen.tap(x, y);
   else await page.mouse.click(x, y);
   await expect(page.locator("#command-kind")).toHaveValue("interact");
   await expect(page.locator("#device")).toHaveValue("s2");
@@ -217,6 +217,8 @@ test("keyboard map targeting stays isolated from form input and editor focus sur
   await expect(page.locator("#add-command")).toBeFocused();
   await add(page, "wait", { "wait-count": "10" });
   await page.locator("#speed").selectOption("4");
+  await page.clock.install({ time: new Date(0) });
+  await page.clock.pauseAt(new Date(60_000));
   await page.locator("#play").click();
   const deleteCommand = page.getByRole("button", { name: "命令 1 を削除", exact: true });
   await deleteCommand.focus();
@@ -224,7 +226,8 @@ test("keyboard map targeting stays isolated from form input and editor focus sur
     (await page.locator("#run-note").innerText()).match(/Step (\d+)/)?.[1],
   );
   const focusedAtStep = await currentStep();
-  await expect.poll(currentStep).toBeGreaterThan(focusedAtStep);
+  await page.clock.runFor(650);
+  expect(await currentStep()).toBeGreaterThan(focusedAtStep);
   await expect(deleteCommand).toBeFocused();
   await page.locator("#play").click();
 });
