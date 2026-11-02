@@ -1,10 +1,5 @@
 import {
   Actor,
-  CanvasButton,
-  CanvasColumn,
-  CanvasLabel,
-  CanvasPanel,
-  CanvasRow,
   Grid,
   PointerClick,
   Renderable,
@@ -15,7 +10,6 @@ import {
   Tween,
   Easing,
   type TweenPlayback,
-  type CanvasNode,
   type Game,
   type SceneContext,
 } from "@simpludify/web";
@@ -43,9 +37,6 @@ export class Board {
     { actor: Actor; position: Transform; visual: Renderable }
   >();
   private readonly outlines: { position: Transform; visual: Renderable }[] = [];
-  private readonly buttons = new Map<string, CanvasNode>();
-  private readonly stepLabel: CanvasNode;
-  private readonly hint: CanvasNode;
   private previous: World;
   private state: World;
   private selected = "A";
@@ -76,46 +67,6 @@ export class Board {
       this.map.set(s.x, s.y, i === 0 ? "s1" : "s2"),
     );
     stage.exits.forEach((e) => this.map.set(e.x, e.y, "exit"));
-    this.stepLabel = CanvasLabel("STEP 00", {
-      fontSize: 16,
-      color: 0xd8e7e7,
-      grow: 1,
-      alignSelf: "center",
-    });
-    this.hint = CanvasLabel("人物を選択 → マスをタップして目的地を指定", {
-      fontSize: 12,
-      color: 0xa5bdc8,
-      textWrap: true,
-    });
-    const characterButtons = stage.people.map((p) => {
-      const button = CanvasButton(`${p.id} ${p.name}`, () => select(p.id), {
-        minHeight: 44,
-        width: 92,
-        fontSize: 15,
-        background: 0x243a49,
-        radius: 8,
-        color: p.color,
-        shrink: 0,
-      });
-      this.buttons.set(p.id, button);
-      return button;
-    });
-    const region = CanvasPanel([], { grow: 1, pointerEvents: "none" });
-    const ui = context.canvasUI(
-      CanvasColumn(
-        [
-          CanvasRow([...characterButtons, this.stepLabel], {
-            gap: 8,
-            minHeight: 44,
-            shrink: 0,
-          }),
-          region,
-          this.hint,
-        ],
-        { padding: 10, gap: 6, height: "100%" },
-      ),
-    );
-    game.bindViewport(ui, region);
     for (const [i, p] of stage.people.entries()) {
       const actor = new Actor({ id: `person-${p.id}` });
       const position = actor.add(new Transform());
@@ -199,14 +150,10 @@ export class Board {
         door.y,
         state.doors.find((d) => d.id === door.id)?.open ? "open" : "closed",
       );
-    this.stepLabel.setText(`STEP ${String(state.step).padStart(2, "0")}`);
     this.draw();
   }
   select(id: string): void {
     this.selected = id;
-    this.buttons.forEach((b, actor) =>
-      b.setStyle({ background: actor === id ? 0x405663 : 0x243a49 }),
-    );
     this.draw();
   }
   focus(cells: Point[] = []): void {

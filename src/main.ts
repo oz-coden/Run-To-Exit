@@ -1,522 +1,292 @@
-import { Game, defineEvent } from "@simpludify/web";
+import {
+  CanvasButton, CanvasColumn, CanvasLabel, CanvasPanel, CanvasRow,
+  CanvasScroll, CanvasSelect, CanvasTextInput, Game,
+  type CanvasNode, type CanvasStyle, type CanvasUI,
+} from "@simpludify/web";
 import { Board } from "./board";
 import {
-  commandText,
-  emptyPlan,
-  initialWorld,
-  same,
-  startRun,
-  stepRun,
-  type Command,
-  type Direction,
-  type LogEntry,
-  type Plan,
-  type Point,
-  type Run,
+  commandText, emptyPlan, initialWorld, same, startRun, stepRun,
+  type Command, type Direction, type LogEntry, type Plan, type Point, type Run,
 } from "./model";
 import { collisionExample, solution, stage } from "./stage";
 import "./style.css";
 
-const root = document.querySelector<HTMLElement>("#app")!;
-root.innerHTML = `
-<header class="topbar"><a class="brand" href="./" aria-label="Run To Exit ホーム"><span class="brand-icon">↱</span><span>RUN TO EXIT<small>COOPERATIVE PLANNING PUZZLE</small></span></a><span class="edition">PROTOTYPE 01 <span class="live-dot"></span></span><a href="https://github.com/oz-coden/Run-To-Exit" target="_blank" rel="noopener" class="repo-link">GitHub ↗</a></header>
-<main>
-  <div class="intro"><div><p class="eyebrow">PLAN TOGETHER. LEAVE TOGETHER.</p><h1>ふたりで、出口へ。</h1><p>命令を組み、同時に動く。脱出のカギは、タイミング。</p></div><div class="mission"><span class="mission-number">01</span><div><b>ふたつの合図</b><small>S1 と S2 を同時に操作 → ゲート開放 6 ステップ</small></div></div></div>
-  <div class="workspace">
-    <section class="map-panel panel" aria-label="ステージと実行操作">
-      <div class="panel-heading"><h2><span class="eyebrow">BUILDING MAP</span>脱出フロア</h2><span class="pill" id="status" role="status">計画中</span></div>
-      <div id="board" aria-label="脱出フロア。Aは(2,3)、Bは(2,5)。スイッチS1は(2,2)、S2は(2,6)、扉は(5,3)、出口は(8,3)。中央の壁は扉だけ通れます。"></div>
-      <div class="legend"><span><i class="legend-a"></i>A アオ</span><span><i class="legend-b"></i>B ベニ</span><span><i class="legend-switch"></i>S1 / S2</span><span><i class="legend-exit"></i>出口</span><span id="gate-status">ゲート：閉鎖</span></div>
-      <a class="mobile-jump" href="#plan-title">命令を編集する ↓</a>
-      <div class="transport"><button id="play" class="primary" disabled>▶ 再生開始</button><button id="step" disabled>1 ステップ →</button><button id="restart" disabled title="編集中の計画を初期状態から実行">↻ 再実行</button><label class="speed-label">速度<select id="speed" aria-label="再生速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label></div>
-      <p id="run-note" class="note">人物を選び、右のパネルから命令を追加しよう。</p>
-      <div id="outcome" hidden tabindex="-1"></div>
-      <details class="guide" open><summary>はじめての脱出計画 <span>遊び方</span></summary><ol><li><b>A・B それぞれに命令を追加。</b>まず近くのスイッチを操作してみよう。</li><li><b>再生か1ステップで、全員が同時に行動。</b>スイッチの効果は翌ステップから。</li><li><b>ゲートが開いている間に、2人を出口へ。</b>同じマスへの進入や、前の人への追従には待機を使おう。</li></ol><p>操作範囲は同じマスか上下左右の隣。条件待機の解除にも1ステップ使うよ。マスの座標は左上が (0,0)。</p><details><summary>ヒント・攻略例</summary><p>Aは先に中央通路を進み、Bは右へ2マス、上へ2マス進んでから追いかけると、混雑を避けられる。</p><button id="load-solution">攻略例をセット</button><button id="load-conflict">衝突例をセット</button><p class="note">この2つのボタンは編集中の命令を置き換えます。</p></details></details>
-    </section>
-    <section class="editor panel" aria-labelledby="plan-title">
-      <div class="panel-heading"><h2 id="plan-title"><span class="eyebrow">YOUR PROGRAM</span>行動を計画する</h2><span id="draft-badge" class="pill">編集中</span></div>
-      <a class="mobile-jump" href="#board">マップを見る ↑</a>
-      <div class="character-tabs" role="group" aria-label="命令を編集する人物"><button data-person="A" aria-pressed="true"><span class="avatar a">A</span><span>アオ<small id="pos-A">(2, 3)</small></span><span class="command-count" id="count-A">0</span></button><button data-person="B" aria-pressed="false"><span class="avatar b">B</span><span>ベニ<small id="pos-B">(2, 5)</small></span><span class="command-count" id="count-B">0</span></button></div>
-      <p class="selected-title"><b id="selected-name">A アオ</b> の次回実行する計画 <span id="selected-cell" aria-live="polite">対象 (8, 3)</span></p>
-      <ol id="commands" class="commands" aria-label="編集中の命令列"></ol>
-      <div class="builder"><label>追加する命令<select id="command-kind"><option value="move">方向へ移動</option><option value="go">座標まで自動移動</option><option value="interact">設備を操作</option><option value="wait">ステップ数で待機</option><option value="until">条件が成立するまで待機</option></select></label>
-        <div id="move-fields" class="fields"><label>方向<select id="direction"><option value="up">↑ 上</option><option value="right">→ 右</option><option value="down">↓ 下</option><option value="left">← 左</option></select></label><label>マス数<input id="move-count" type="number" min="1" max="50" value="1" inputmode="numeric"></label></div>
-        <div id="go-fields" class="fields" hidden><label>X 座標<input id="target-x" type="number" min="0" max="10" value="8" inputmode="numeric"></label><label>Y 座標<input id="target-y" type="number" min="0" max="7" value="3" inputmode="numeric"></label><p class="field-note">マップをタップしても指定できます。</p></div>
-        <div id="interact-fields" hidden><label>スイッチ<select id="device"><option value="s1">S1 · (2, 2)</option><option value="s2">S2 · (2, 6)</option></select></label></div>
-        <div id="wait-fields" hidden><label>待機するステップ数<input id="wait-count" type="number" min="1" max="100" value="1" inputmode="numeric"></label></div>
-        <div id="until-fields" hidden><label>待つ条件<select id="condition"><option value="open">ゲートが開く</option><option value="closed">ゲートが閉じる</option><option value="escaped">もう1人が脱出する</option><option value="at">もう1人が指定座標に来る</option></select></label><div id="condition-position" class="fields" hidden><label>待機対象 X<input id="condition-x" type="number" min="0" max="10" value="4"></label><label>待機対象 Y<input id="condition-y" type="number" min="0" max="7" value="3"></label></div><p class="field-note">条件の判定と解除に1ステップ。その翌ステップに次の命令へ。</p></div>
-        <p id="edit-error" role="alert" hidden></p><button id="add-command" class="add-button">＋ 命令を追加</button>
-      </div>
-      <details class="snapshot"><summary>現在実行中の計画 <span id="snapshot-state">未実行</span></summary><div id="snapshot-content">再生開始時に計画を固定します。</div></details>
-    </section>
-  </div>
-  <section class="log-panel panel" aria-labelledby="log-title"><div class="panel-heading"><h2 id="log-title"><span class="eyebrow">EXECUTION TRACE</span>実行ログ</h2><label class="log-filter">表示<select id="log-filter"><option value="important">重要イベント</option><option value="all">すべて</option></select></label></div><p class="note">イベントを選ぶと、関係するマスと命令を強調します。</p><div id="log" class="log" tabindex="0" aria-label="実行ログ"><p class="empty-log">まだ実行していません。計画を組んで、はじめの一歩を。</p></div></section>
-</main><footer><span>RUN TO EXIT <span class="muted">/</span> ふたり分の計画、ひとつの出口。</span><span>Made with <a href="https://github.com/oz-coden/Simpludify" target="_blank" rel="noopener">Simpludify ↗</a></span></footer>`;
-const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
-  document.getElementById(id) as T;
-const value = (id: string) => $<HTMLInputElement>(id).value;
-let draft: Plan = emptyPlan(stage),
-  selected = "A",
-  run: Run | null = null,
-  playing = false,
-  accumulator = 0;
-let board: Board | undefined;
-let highlightedCommand: { actor: string; index: number } | null = null;
+const colors = { surface: 0x192e3c, raised: 0x254151, accent: 0x416c76, text: 0xe4eeee, muted: 0xa9c3cd };
+const small: CanvasStyle = { fontSize: 14, color: colors.muted, shrink: 0 };
+const control: CanvasStyle = { fontSize: 15, minHeight: 44, padding: 10, background: colors.raised, shrink: 0 };
+const label = (text: string, style: CanvasStyle = {}) => CanvasLabel(text, { ...small, ...style });
+const button = (text: string, action: () => void, style: CanvasStyle = {}) => CanvasButton(text, action, { ...control, ...style });
+const field = (name: string, value: string) => CanvasTextInput({ label: name, value }, { ...control, width: "100%", height: 44 });
+const choose = <T extends string>(name: string, options: readonly (readonly [T, string])[], value: T) => CanvasSelect(
+  options.map(([value, label]) => ({ value, label })), { label: name, value }, { ...control, width: "100%", height: 44 },
+);
+let draft: Plan = emptyPlan(stage), selected = "A", run: Run | null = null;
+let playing = false, accumulator = 0, board: Board | undefined, ui: CanvasUI;
+let highlighted: { actor: string; index: number } | null = null;
+let selectedLog: LogEntry | undefined;
+let tab = "map", compact = false, logPage = 0;
+const PAGE_SIZE = 80;
 const initial = initialWorld(stage);
 const world = () => run?.state ?? initial;
-const StepCommitted = defineEvent<Run>("RunToExit.StepCommitted");
-const shutdown = new AbortController();
-function listen(id: string, callback: () => void, event = "click"): void {
-  $(id).addEventListener(event, callback, { signal: shutdown.signal });
+const status = label("計画中", { fontSize: 16, color: colors.text });
+const runNote = label("人物を選び、命令を追加しよう。"), outcome = label("");
+const gate = label(""), positions = label(""), target = label("対象 (8, 3)");
+const draftBadge = label("編集中"), error = label("", { color: 0xffb2a6 });
+const play = button("▶ 再生開始", () => {
+  if (!run) newRun();
+  playing = !playing; accumulator = 0; renderStatus();
+});
+const step = button("1 ステップ →", () => { playing = false; accumulator = 0; takeStep(); });
+const restart = button("↻ 再実行", () => { newRun(); playing = true; renderStatus(); });
+const speed = choose("再生速度", [["0.5", "0.5×"], ["1", "1×"], ["2", "2×"], ["4", "4×"]], "1");
+speed.onChange(() => { accumulator = 0; });
+const region = CanvasPanel([], { grow: 1, minHeight: 180, pointerEvents: "none" });
+const mapPanel = CanvasColumn([
+  label("01 / ふたつの合図", { fontSize: 20, color: colors.text }),
+  label("S1とS2を同時に操作 → ゲート開放6ステップ"),
+  region, positions, gate,
+  CanvasRow([play, step, restart], { gap: 6, wrap: true, shrink: 0 }),
+  CanvasRow([label("速度", { alignSelf: "center" }), speed], { gap: 8, shrink: 0 }),
+  runNote, outcome,
+], { gap: 8, padding: 12, background: colors.surface, grow: 1, minWidth: 0 });
+
+const kind = choose("追加する命令", [["move", "方向へ移動"], ["go", "座標まで自動移動"], ["interact", "設備を操作"], ["wait", "ステップ数で待機"], ["until", "条件が成立するまで待機"]], "move");
+const direction = choose<Direction>("方向", [["up", "↑ 上"], ["right", "→ 右"], ["down", "↓ 下"], ["left", "← 左"]], "up");
+const moveCount = field("マス数", "1"), x = field("X 座標", "8"), y = field("Y 座標", "3");
+const waitCount = field("待機するステップ数", "1"), cx = field("待機対象 X", "4"), cy = field("待機対象 Y", "3");
+const device = choose("スイッチ", [["s1", "S1 · (2, 2)"], ["s2", "S2 · (2, 6)"]], "s1");
+const condition = choose("待つ条件", [["open", "ゲートが開く"], ["closed", "ゲートが閉じる"], ["escaped", "もう1人が脱出する"], ["at", "もう1人が指定座標に来る"]], "open");
+const fields = new Map([
+  ["move", CanvasColumn([label("方向"), direction, label("マス数（1〜50）"), moveCount], { gap: 6, shrink: 0 })],
+  ["go", CanvasColumn([label("X 座標（0〜10）"), x, label("Y 座標（0〜7）"), y, label("マップをタップしても指定できます。")], { gap: 6, shrink: 0 })],
+  ["interact", CanvasColumn([label("操作するスイッチ"), device], { gap: 6, shrink: 0 })],
+  ["wait", CanvasColumn([label("待機するステップ数（1〜100）"), waitCount], { gap: 6, shrink: 0 })],
+]);
+const conditionPosition = CanvasColumn([label("待機対象 X（0〜10）"), cx, label("待機対象 Y（0〜7）"), cy], { gap: 6, shrink: 0 });
+fields.set("until", CanvasColumn([label("待つ条件"), condition, conditionPosition, label("条件の判定と解除に1ステップ。その翌ステップに次の命令へ。")], { gap: 6, shrink: 0 }));
+function showFields(): void {
+  fields.forEach((node, name) => { node.visible = name === kind.value; });
+  conditionPosition.visible = condition.value === "at";
+  error.setText("");
 }
+kind.onChange(showFields); condition.onChange(showFields); showFields();
+function integer(input: ReturnType<typeof field>, min: number, max: number): number {
+  const raw = input.editing ? input.draft.text : input.value;
+  const value = Number(raw);
+  if (input.draft.composing || !raw.trim() || !Number.isSafeInteger(value) || value < min || value > max)
+    throw new Error(`${input.text}：${min}〜${max} の整数を入力してください。`);
+  input.commit();
+  return value;
+}
+const add = button("＋ 命令を追加", () => {
+  try {
+    if (draft[selected].length >= 50) throw new Error("1人につき50命令まで追加できます。");
+    let command: Command;
+    switch (kind.value) {
+      case "move": command = { kind: "move", direction: direction.value!, count: integer(moveCount, 1, 50) }; break;
+      case "go": command = { kind: "go", x: integer(x, 0, 10), y: integer(y, 0, 7) }; break;
+      case "interact": command = { kind: "interact", target: device.value! }; break;
+      case "wait": command = { kind: "wait", steps: integer(waitCount, 1, 100) }; break;
+      default: {
+        const actor = selected === "A" ? "B" : "A";
+        command = { kind: "until", condition: condition.value === "escaped"
+          ? { kind: "escaped", actor } : condition.value === "at"
+            ? { kind: "at", actor, x: integer(cx, 0, 10), y: integer(cy, 0, 7) }
+            : { kind: "door", door: "gate", open: condition.value === "open" } };
+      }
+    }
+    draft[selected].push(command); highlighted = null; error.setText(""); renderCommands(); renderStatus();
+  } catch (e) { error.setText((e as Error).message); }
+}, { background: colors.accent });
+const commands = CanvasColumn([], { gap: 6, shrink: 0 });
+const snapshot = CanvasColumn([], { gap: 6, shrink: 0 });
+let snapshotOpen = false;
+const snapshotToggle = button("現在実行中の計画を表示", () => {
+  snapshotOpen = !snapshotOpen; snapshot.visible = snapshotOpen;
+  snapshotToggle.setText(snapshotOpen ? "現在実行中の計画を隠す" : "現在実行中の計画を表示");
+  renderSnapshot();
+});
+snapshot.visible = false;
+const peopleButtons = stage.people.map(p => button(`${p.id} ${p.name}`, () => select(p.id), { grow: 1 }));
+const editor = CanvasScroll([
+  label("行動を計画する", { fontSize: 20, color: colors.text }), draftBadge,
+  CanvasRow(peopleButtons, { gap: 8, shrink: 0 }), target,
+  commands, label("追加する命令"), kind, ...fields.values(), error, add, snapshotToggle, snapshot,
+], { grow: 1, minWidth: 0, padding: 12, gap: 10, background: colors.surface });
+const filter = choose("ログ表示", [["important", "重要イベント"], ["all", "すべて"]], "important");
+const logItems = CanvasColumn([], { gap: 6, shrink: 0 });
+const logRange = label("");
+const previous = button("前の80件", () => { logPage--; renderLog(true); });
+const next = button("次の80件", () => { logPage++; renderLog(true); });
+const logScroll = CanvasScroll([logItems], { grow: 1, minHeight: 100 });
+const logs = CanvasColumn([
+  label("実行ログ", { fontSize: 20, color: colors.text }), filter,
+  label("イベントを選ぶと、関係するマスと実行時の命令を強調します。"), logRange,
+  CanvasRow([previous, next], { gap: 8, shrink: 0 }), logScroll,
+], { grow: 1, minWidth: 0, padding: 12, gap: 10, background: colors.surface });
+filter.onChange(() => { logPage = 0; renderLog(true); });
+const load = (plan: Plan) => { draft = structuredClone(plan); highlighted = null; renderCommands(); renderStatus(); };
+const help = CanvasScroll([
+  label("はじめての脱出計画", { fontSize: 20, color: colors.text }),
+  label("1. A・Bそれぞれに命令を追加。近くのスイッチを操作してみよう。"),
+  label("2. 再生か1ステップで、全員が同時に行動。スイッチの効果は翌ステップから。"),
+  label("3. ゲートが開いている間に、2人を出口へ。同じマスへの進入・追従・位置交換はConflict。待機でタイミングを調整しよう。"),
+  label("操作範囲は同じマスか上下左右の隣。条件待機の解除にも1ステップ使います。座標は左上が(0,0)。"),
+  label("マップ：Aは(2,3)、Bは(2,5)。S1は(2,2)、S2は(2,6)、扉は(5,3)、出口は(8,3)。中央の壁は扉だけ通れます。"),
+  label("キーボード：Tabで操作を選び、Enter・Spaceで実行。入力欄と選択欄の矢印キーは入力専用。マップにフォーカスしたときだけ矢印でマスを選択。"),
+  label("スマホ：上のタブでマップ・命令・ログを切り替え。長い命令やログは指でスクロール。命令の↑↓で並べ替え、×で削除。"),
+  label("編集中の変更は次回の再実行から反映。再生開始時の計画は固定されます。"),
+  label("ヒント：Aは先に中央通路を進み、Bは右へ2マス、上へ2マス進んで追いかけると混雑を避けられます。"),
+  button("攻略例をセット", () => load(solution)), button("衝突例をセット", () => load(collisionExample)),
+  label("攻略例・衝突例は編集中の命令を置き換えます。"),
+], { grow: 1, minWidth: 0, padding: 12, gap: 16, background: colors.surface });
+const content = CanvasRow([mapPanel, editor, logs, help], { grow: 1, minHeight: 0, gap: 10 });
+const tabs = ["マップ", "命令", "ログ", "遊び方"].map((text, i) => button(text, () => setTab(["map", "editor", "logs", "help"][i]), { grow: 1, padding: 6, fontSize: 14, minWidth: 0 }));
+function setTab(value: string): void { tab = value; responsive(); }
+function responsive(): void {
+  mapPanel.visible = !compact || tab === "map";
+  editor.visible = tab === "editor" || (!compact && tab === "map");
+  logs.visible = tab === "logs"; help.visible = tab === "help";
+  mapPanel.setStyle({ grow: 1.25 });
+  tabs.forEach((node, i) => node.setStyle({ background: ["map", "editor", "logs", "help"][i] === tab ? colors.accent : colors.raised }));
+}
+const root = CanvasColumn([
+  CanvasRow([label("RUN TO EXIT", { fontSize: 20, color: colors.text, grow: 1 }), status], { gap: 8, wrap: true, shrink: 0 }),
+  CanvasRow(tabs, { gap: 5, shrink: 0 }), content,
+], { height: "100%", padding: 10, gap: 10 });
 function select(id: string): void {
-  selected = id;
-  board?.select(id);
-  highlightedCommand = null;
-  renderEditor();
-  board?.focus(run?.conflict?.cells);
+  selected = id; board?.select(id); highlighted = null;
+  renderCommands(); renderStatus(); board?.focus(run?.conflict?.cells);
 }
 function pick(point: Point): void {
-  $("target-x").setAttribute("value", String(point.x));
-  $<HTMLInputElement>("target-x").value = String(point.x);
-  $<HTMLInputElement>("target-y").value = String(point.y);
-  $<HTMLInputElement>("condition-x").value = String(point.x);
-  $<HTMLInputElement>("condition-y").value = String(point.y);
-  $("selected-cell").textContent = `対象 (${point.x}, ${point.y})`;
-  const device = stage.switches.find((s) => same(s, point));
-  if (device) {
-    $<HTMLSelectElement>("command-kind").value = "interact";
-    $<HTMLSelectElement>("device").value = device.id;
-  } else if (!world().people.some((p) => !p.escaped && same(p, point)))
-    $<HTMLSelectElement>("command-kind").value = "go";
-  showFields();
+  x.value = cx.value = String(point.x); y.value = cy.value = String(point.y);
+  target.setText(`対象 (${point.x}, ${point.y})`);
+  const found = stage.switches.find(s => same(s, point));
+  if (found) { kind.value = "interact"; device.value = found.id as "s1" | "s2"; }
+  else if (!world().people.some(p => !p.escaped && same(p, point))) kind.value = "go";
   board?.focus([point]);
 }
-function showFields(): void {
-  for (const kind of ["move", "go", "interact", "wait", "until"])
-    $(`${kind}-fields`).hidden = kind !== value("command-kind");
-  $("condition-position").hidden = value("condition") !== "at";
-  $("edit-error").hidden = true;
-}
-function number(id: string, min: number, max: number): number {
-  const n = Number(value(id));
-  if (!Number.isSafeInteger(n) || n < min || n > max || !value(id).trim())
-    throw new Error(`${min}〜${max} の整数を入力してください。`);
-  return n;
-}
-function addCommand(): void {
-  try {
-    if (draft[selected].length >= 50)
-      throw new Error("1人につき50命令まで追加できます。");
-    let command: Command;
-    switch (value("command-kind")) {
-      case "move":
-        command = {
-          kind: "move",
-          direction: value("direction") as Direction,
-          count: number("move-count", 1, 50),
-        };
-        break;
-      case "go":
-        command = {
-          kind: "go",
-          x: number("target-x", 0, 10),
-          y: number("target-y", 0, 7),
-        };
-        break;
-      case "interact":
-        command = { kind: "interact", target: value("device") };
-        break;
-      case "wait":
-        command = { kind: "wait", steps: number("wait-count", 1, 100) };
-        break;
-      default: {
-        const other = selected === "A" ? "B" : "A";
-        command = {
-          kind: "until",
-          condition:
-            value("condition") === "escaped"
-              ? { kind: "escaped", actor: other }
-              : value("condition") === "at"
-                ? {
-                    kind: "at",
-                    actor: other,
-                    x: number("condition-x", 0, 10),
-                    y: number("condition-y", 0, 7),
-                  }
-                : {
-                    kind: "door",
-                    door: "gate",
-                    open: value("condition") === "open",
-                  },
-        };
-      }
-    }
-    draft[selected].push(command);
-    highlightedCommand = null;
-    renderEditor();
-    renderStatus();
-  } catch (error) {
-    $("edit-error").textContent = (error as Error).message;
-    $("edit-error").hidden = false;
+// Keep row identity across simulation updates; rebuild only after an actual draft edit.
+let commandRows: { row: CanvasNode; text: CanvasNode; actions: CanvasNode[]; command: Command }[] = [];
+let renderedPerson = "";
+function renderCommands(): void {
+  if (renderedPerson !== selected || commandRows.length !== draft[selected].length || commandRows.some((row, i) => row.command !== draft[selected][i])) {
+    commands.clear(); renderedPerson = selected;
+    commandRows = draft[selected].map((command, index) => {
+      const text = label(`${index + 1}. ${commandText(command)}`, { color: colors.text });
+      const actions = ([[-1, "上へ移動", "↑"], [1, "下へ移動", "↓"], [0, "削除", "×"]] as const).map(([delta, title, glyph]) => {
+        const action = button(`命令 ${index + 1} を${title} ${glyph}`, () => {
+          const items = draft[selected];
+          if (!delta) items.splice(index, 1);
+          else [items[index], items[index + delta]] = [items[index + delta], items[index]];
+          highlighted = null; renderCommands(); renderStatus();
+          const at = Math.max(0, Math.min(commandRows.length - 1, index + delta));
+          const focus = commandRows[at]?.actions.find(n => n.enabled) ?? add;
+          ui.focus(focus);
+        }, { grow: 1, padding: 6, fontSize: 12, minWidth: 0 });
+        action.enabled = !(delta === -1 && index === 0) && !(delta === 1 && index === draft[selected].length - 1);
+        return action;
+      });
+      const row = CanvasColumn([text, CanvasRow(actions, { gap: 4, shrink: 0 })], { gap: 6, padding: 8, background: colors.raised, shrink: 0 });
+      commands.add(row); return { row, text, actions, command };
+    });
+    if (!commandRows.length) commands.add(label("ここから脱出計画がはじまる。下のメニューから命令を追加しよう。"));
   }
-}
-function icon(command: Command): string {
-  return command.kind === "move"
-    ? { up: "↑", right: "→", down: "↓", left: "←" }[command.direction]
-    : { go: "◎", interact: "⌁", wait: "◷", until: "◇" }[command.kind];
-}
-function renderEditor(): void {
-  const focusedCommand = document.activeElement instanceof HTMLButtonElement
-    && $("commands").contains(document.activeElement)
-      ? document.activeElement.getAttribute("aria-label") : null;
-  document
-    .querySelectorAll<HTMLButtonElement>("[data-person]")
-    .forEach((b) =>
-      b.setAttribute("aria-pressed", String(b.dataset.person === selected)),
-    );
-  $("selected-name").textContent =
-    `${selected} ${stage.people.find((p) => p.id === selected)!.name}`;
-  stage.people.forEach((p) => {
-    $(`count-${p.id}`).textContent = `${draft[p.id].length}`;
-  });
-  const list = $("commands");
-  list.replaceChildren();
-  if (!draft[selected].length) {
-    const empty = document.createElement("li");
-    empty.className = "empty-commands";
-    empty.textContent =
-      "ここから脱出計画がはじまる。\n下のメニューから命令を追加しよう。";
-    list.append(empty);
+  for (const [index, row] of commandRows.entries()) {
+    const active = run && JSON.stringify(run.plan[selected]?.[index]) === JSON.stringify(row.command) && world().people.find(p => p.id === selected)?.pc === index;
+    row.row.setStyle({ background: highlighted?.actor === selected && highlighted.index === index ? 0x685237 : active ? 0x345f63 : colors.raised });
   }
-  draft[selected].forEach((command, index) => {
-    const li = document.createElement("li");
-    li.className = "command";
-    li.dataset.index = String(index);
-    const unchanged =
-      run &&
-      JSON.stringify(run.plan[selected]?.[index]) === JSON.stringify(command);
-    if (
-      unchanged &&
-      world().people.find((p) => p.id === selected)?.pc === index &&
-      !run?.state.people.find((p) => p.id === selected)?.escaped
-    )
-      li.classList.add("current-command");
-    if (
-      highlightedCommand?.actor === selected &&
-      highlightedCommand.index === index
-    )
-      li.classList.add("highlighted-command");
-    const number = document.createElement("span");
-    number.className = "line-number";
-    number.textContent = String(index + 1).padStart(2, "0");
-    const glyph = document.createElement("span");
-    glyph.className = `command-icon ${command.kind}`;
-    glyph.textContent = icon(command);
-    const label = document.createElement("span");
-    label.className = "command-label";
-    label.textContent = commandText(command);
-    li.append(number, glyph, label);
-    for (const [text, title, delta] of [
-      ["↑", "上へ移動", -1],
-      ["↓", "下へ移動", 1],
-      ["×", "削除", 0],
-    ] as const) {
-      const button = document.createElement("button");
-      button.textContent = text;
-      button.title = title;
-      button.setAttribute("aria-label", `命令 ${index + 1} を${title}`);
-      button.disabled =
-        (delta === -1 && index === 0) ||
-        (delta === 1 && index === draft[selected].length - 1);
-      button.onclick = () => {
-        const items = draft[selected];
-        if (!delta) items.splice(index, 1);
-        else
-          [items[index], items[index + delta]] = [
-            items[index + delta],
-            items[index],
-          ];
-        highlightedCommand = null;
-        renderEditor();
-        renderStatus();
-        const remaining = $("commands").querySelectorAll<HTMLLIElement>(".command");
-        const next = Math.max(0, Math.min(remaining.length - 1, index + delta));
-        remaining[next]?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
-        if (!remaining.length) $("add-command").focus();
-      };
-      li.append(button);
-    }
-    list.append(li);
-  });
-  if (focusedCommand) {
-    const buttons = list.querySelectorAll<HTMLButtonElement>("button");
-    [...buttons].find((b) => b.getAttribute("aria-label") === focusedCommand && !b.disabled)
-      ?.focus({ preventScroll: true });
+  peopleButtons.forEach((node, i) => node.setStyle({ background: stage.people[i].id === selected ? colors.accent : colors.raised }));
+}
+let snapshotPlan: Plan | undefined;
+let snapshotRendered = false;
+function renderSnapshot(): void {
+  if (!snapshotOpen) return;
+  if (!snapshotRendered || snapshotPlan !== run?.plan) {
+    snapshotRendered = true;
+    snapshot.clear(); snapshotPlan = run?.plan;
+    if (!run) snapshot.add(label("再生開始時に計画を固定します。"));
+    else for (const person of stage.people) snapshot.add(label(`${person.id} ${person.name}\n${run.plan[person.id].map((c, i) => `${i + 1}. ${commandText(c)}`).join("\n") || "命令なし"}`));
   }
-  const snapshot = $("snapshot-content");
-  snapshot.replaceChildren();
-  if (run)
-    for (const p of stage.people) {
-      const heading = document.createElement("b");
-      heading.textContent = `${p.id} ${p.name}`;
-      snapshot.append(heading);
-      const ol = document.createElement("ol");
-      for (const [i, c] of run.plan[p.id].entries()) {
-        const li = document.createElement("li");
-        li.textContent = commandText(c);
-        if (world().people.find((a) => a.id === p.id)?.pc === i)
-          li.className = "active-snapshot";
-        ol.append(li);
-      }
-      if (!ol.childElementCount) {
-        const li = document.createElement("li");
-        li.textContent = "命令なし";
-        ol.append(li);
-      }
-      snapshot.append(ol);
-    }
-  else snapshot.textContent = "再生開始時に計画を固定します。";
 }
 function renderStatus(): void {
-  const state = world(),
-    changed = run && JSON.stringify(draft) !== JSON.stringify(run.plan);
-  $("status").textContent = run?.conflict
-    ? "Conflict で停止"
-    : state.cleared
-      ? "全員脱出！"
-      : playing
-        ? "実行中"
-        : run
-          ? "一時停止"
-          : "計画中";
-  $("status").className =
-    `pill ${run?.conflict ? "danger" : state.cleared ? "success" : ""}`;
-  $("draft-badge").textContent = changed ? "次回用の変更あり" : "編集中";
-  $("draft-badge").classList.toggle("changed", !!changed);
-  $("snapshot-state").textContent = run
-    ? `Step ${state.step} / 固定済み`
-    : "未実行";
-  $<HTMLButtonElement>("play").disabled = !!run?.conflict || state.cleared;
-  $<HTMLButtonElement>("step").disabled = !!run?.conflict || state.cleared;
-  $("play").textContent = playing
-    ? "Ⅱ 一時停止"
-    : run
-      ? "▶ 再開"
-      : "▶ 再生開始";
-  const door = state.doors[0];
-  $("gate-status").textContent = door.open
-    ? `次の Step ${state.step + 1}：開放 / ${door.until} まで`
-    : `次の Step ${state.step + 1}：ゲート閉鎖`;
-  stage.people.forEach((p) => {
-    const actor = state.people.find((a) => a.id === p.id)!;
-    $(`pos-${p.id}`).textContent = actor.escaped
-      ? "脱出済み"
-      : `(${actor.x}, ${actor.y})`;
-  });
-  $("run-note").textContent = changed
-    ? "編集中の変更は、↻ 再実行から適用されます。現在の実行計画は固定済み。"
-    : run
-      ? `世界 Step ${state.step}。実行計画は固定済み。編集は次回に適用。`
-      : "人物を選び、命令を追加しよう。初期状態から全員同時に動きます。";
-  const outcome = $("outcome");
-  outcome.hidden = !run?.conflict && !state.cleared;
-  outcome.replaceChildren();
-  if (run?.conflict) {
-    outcome.className = "outcome conflict";
-    const c = run.conflict,
-      title = document.createElement("h3");
-    title.textContent = `Step ${c.step}：${c.kind}`;
-    const text = document.createElement("p");
-    text.textContent = c.message;
-    const detail = document.createElement("p");
-    detail.className = "note";
-    detail.textContent = `関係者 ${c.actors.join("・") || "設備"} / ${c.cells.map((p) => `(${p.x}, ${p.y})`).join(" ")} / 最後に確定した Step ${state.step}`;
-    const commands = document.createElement("p");
-    commands.className = "note";
-    commands.textContent = c.commands
-      .map(
-        (c) =>
-          `${c.actor} 命令${c.index + 1}：${c.command ? commandText(c.command) : "命令なし"}`,
-      )
-      .join(" / ");
-    outcome.append(title, text, detail, commands);
-    board?.focus(c.cells);
-  } else if (state.cleared) {
-    outcome.className = "outcome clear";
-    const heading = document.createElement("h3");
-    heading.textContent = "計画成功。全員、無事に脱出！";
-    const text = document.createElement("p");
-    text.textContent = `${state.step} ステップでクリア。別の命令や待機でも、脱出計画を試してみよう。`;
-    outcome.append(heading, text);
-  }
+  const state = world(), changed = run && JSON.stringify(draft) !== JSON.stringify(run.plan);
+  status.setText(run?.conflict ? "Conflict で停止" : state.cleared ? "全員脱出！" : playing ? "実行中" : run ? "一時停止" : "計画中");
+  play.enabled = step.enabled = !run?.conflict && !state.cleared;
+  play.setText(playing ? "Ⅱ 一時停止" : run ? "▶ 再開" : "▶ 再生開始");
+  draftBadge.setText(`${selected} の次回実行する計画 / ${draft[selected].length}命令 / ${changed ? "次回用の変更あり" : "編集中"}`);
+  positions.setText(state.people.map(p => `${p.id} ${p.escaped ? "脱出済み" : `(${p.x}, ${p.y})`}`).join(" · "));
+  const door = state.doors[0]; gate.setText(door.open ? `次の Step ${state.step + 1}：開放 / ${door.until} まで` : `次の Step ${state.step + 1}：ゲート閉鎖`);
+  runNote.setText(`世界 Step ${state.step}。${changed ? "編集中の変更は再実行から適用。現在の計画は固定済み。" : run ? "実行計画は固定済み。編集は次回に適用。" : "人物を選び、命令を追加しよう。"}`);
+  const c = run?.conflict;
+  outcome.setText(c ? `Step ${c.step}：${c.kind}\n${c.message}\n関係者 ${c.actors.join("・")} / 最後に確定した Step ${state.step}\n${c.commands.map(c => `${c.actor} 命令${c.index + 1}：${c.command ? commandText(c.command) : "命令なし"}`).join(" / ")}` : state.cleared ? `計画成功。全員、無事に脱出！ ${state.step} ステップでクリア。` : "");
+  outcome.visible = !!c || state.cleared; outcome.setStyle({ color: c ? 0xffb2a6 : 0x95e2c2 });
+  renderCommands(); renderSnapshot();
 }
-function renderLog(): void {
-  const log = $("log"),
-    nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 70;
-  log.replaceChildren();
-  const entries = (run?.logs ?? []).filter(
-    (l) =>
-      value("log-filter") === "all" ||
-      !["start", "complete", "move", "wait"].includes(l.kind),
-  );
-  if (!entries.length) {
-    const p = document.createElement("p");
-    p.className = "empty-log";
-    p.textContent = run
-      ? "重要イベントはまだありません。「すべて」で移動や待機を確認できます。"
-      : "まだ実行していません。計画を組んで、はじめの一歩を。";
-    log.append(p);
+let shownEntries: LogEntry[] = [];
+const logButtons = new Map<LogEntry, CanvasNode>();
+function renderLog(reset = false): void {
+  const entries = (run?.logs ?? []).filter(l => filter.value === "all" || !["start", "complete", "move", "wait"].includes(l.kind));
+  logPage = Math.max(0, Math.min(logPage, Math.ceil(entries.length / PAGE_SIZE) - 1));
+  const start = logPage * PAGE_SIZE, page = entries.slice(start, start + PAGE_SIZE);
+  const append = !reset && shownEntries.length <= page.length && shownEntries.every((e, i) => e === page[i]);
+  if (!append || !shownEntries.length) { logItems.clear(); logButtons.clear(); }
+  for (const entry of page.slice(append ? shownEntries.length : 0)) {
+    const node = button(`Step ${entry.step} ${entry.actors.join("・") || "SYS"}：${entry.text}`, () => focusLog(entry), { fontSize: 14 });
+    logItems.add(node); logButtons.set(entry, node);
   }
-  for (const entry of entries) {
-    const button = document.createElement("button");
-    button.className = `log-entry log-${entry.kind}`;
-    const step = document.createElement("span");
-    step.className = "log-step";
-    step.textContent = String(entry.step).padStart(2, "0");
-    const who = document.createElement("span");
-    who.className = "log-who";
-    who.textContent = entry.actors.join("・") || "SYS";
-    const text = document.createElement("span");
-    text.textContent = entry.text;
-    button.append(step, who, text);
-    button.onclick = () => focusLog(entry);
-    log.append(button);
-  }
-  if (nearBottom) log.scrollTop = log.scrollHeight;
+  if (!page.length) logItems.add(label(run ? "重要イベントはまだありません。「すべて」で移動や待機を確認できます。" : "まだ実行していません。"));
+  shownEntries = page;
+  for (const [entry, node] of logButtons) node.setStyle({ background: entry === selectedLog ? 0x685237 : colors.raised });
+  logRange.setText(`${entries.length}件 / ${page.length ? start + 1 : 0}〜${start + page.length}件（80件ずつ表示）`);
+  previous.enabled = logPage > 0; next.enabled = start + PAGE_SIZE < entries.length;
+  if (reset) logScroll.scrollTo(0, 0);
 }
 function focusLog(entry: LogEntry): void {
-  const actor = entry.actors[0];
-  if (actor) select(actor);
-  highlightedCommand =
-    actor && entry.command !== undefined
-      ? { actor, index: entry.command }
-      : null;
-  renderEditor();
-  board?.focus(entry.cells);
-  $("commands")
-    .querySelector(".highlighted-command")
-    ?.scrollIntoView({ block: "nearest" });
+  selectedLog = entry;
+  if (entry.actors[0]) select(entry.actors[0]);
+  highlighted = entry.actors[0] && entry.command !== undefined ? { actor: entry.actors[0], index: entry.command } : null;
+  renderCommands(); board?.focus(entry.cells); renderLog();
+  // The fixed snapshot remains the authoritative instruction when the draft has changed.
+  if (entry.command !== undefined) runNote.setText(`Step ${entry.step}：${entry.text} / 実行時の命令 ${entry.command + 1}。編集中の計画とは別の記録です。`);
 }
 function newRun(): void {
-  run = startRun(stage, draft);
-  accumulator = 0;
-  highlightedCommand = null;
-  board?.sync(run.state, false);
-  board?.focus();
-  renderEditor();
-  renderStatus();
-  renderLog();
+  run = startRun(stage, draft); accumulator = 0; highlighted = null; selectedLog = undefined; logPage = 0;
+  board?.sync(run.state, false); board?.focus(); renderStatus(); renderLog(true);
 }
-function takeStep(animate = true): void {
+function takeStep(): void {
   if (!run) newRun();
-  run = stepRun(run!);
-  if (run.conflict || run.state.cleared) playing = false;
-  board?.sync(run.state, animate, 0.25 / Number(value("speed")));
-  if (run.conflict) board?.focus(run.conflict.cells);
-  else board?.focus();
-  game.engine.scene.events.emit(StepCommitted, run);
+  run = stepRun(run!); if (run.conflict || run.state.cleared) playing = false;
+  board?.sync(run.state, true, 0.25 / Number(speed.value)); board?.focus(run.conflict?.cells);
+  renderStatus(); renderLog();
 }
-listen("play", () => {
-  if (!run) newRun();
-  playing = !playing;
-  accumulator = 0;
-  renderStatus();
-});
-listen("step", () => {
-  playing = false;
-  accumulator = 0;
-  takeStep();
-});
-listen("restart", () => {
-  playing = false;
-  newRun();
-  playing = true;
-  renderStatus();
-});
-listen("add-command", addCommand);
-listen("command-kind", showFields, "change");
-listen("condition", showFields, "change");
-listen(
-  "speed",
-  () => {
-    accumulator = 0;
-  },
-  "change",
-);
-listen("log-filter", renderLog, "change");
-for (const [id, plan] of [
-  ["load-solution", solution],
-  ["load-conflict", collisionExample],
-] as const)
-  listen(id, () => {
-    draft = structuredClone(plan);
-    highlightedCommand = null;
-    renderEditor();
-    renderStatus();
-  });
-document.querySelectorAll<HTMLButtonElement>("[data-person]").forEach((b) =>
-  b.addEventListener("click", () => select(b.dataset.person!), {
-    signal: shutdown.signal,
-  }),
-);
 export const game = new Game({
-  parent: $("board"),
-  resolution: { width: 640, height: 448 },
-  maxDelta: 0.25,
-  tokens: { background: "#152936" },
-  onError: (error) => {
-    playing = false;
-    $("run-note").textContent =
-      `ゲームの起動または描画に失敗しました：${String(error)}`;
-  },
+  parent: document.querySelector<HTMLElement>("#app")!, resolution: { width: 640, height: 448 }, maxDelta: 0.25,
+  tokens: { background: "#101f2a" }, onError: e => { playing = false; runNote.setText(`ゲームの起動または描画に失敗しました：${String(e)}`); },
 });
-game.element.setAttribute("tabindex", "0");
-game.element.setAttribute("role", "group");
-game.element.setAttribute(
-  "aria-label",
-  "脱出フロア。矢印キーで対象マスを移動、Enterで人物を選択。Tabで人物ボタンへ。",
-);
-game.scene("puzzle", (context) => {
+game.scene("puzzle", context => {
+  ui = context.canvasUI(root); game.bindViewport(ui, region);
   board = new Board(game, context, stage, initial, select, pick);
-  board.select(selected);
-  board.focus();
-  context.scene.events.on(StepCommitted, () => {
-    renderEditor();
-    renderStatus();
-    renderLog();
-  });
-  context.onUpdate((seconds) => {
-    if (!playing || document.hidden) return;
+  board.select(selected); board.focus(); renderStatus(); renderLog(); responsive();
+  context.onUpdate(seconds => {
+    const narrow = root.bounds.width < 850;
+    if (narrow !== compact) { compact = narrow; responsive(); }
+    if (!playing) return;
     accumulator += seconds;
-    const interval = 0.65 / Number(value("speed"));
-    // Pace affects when steps are requested, never the integer state transition.
-    if (accumulator >= interval) {
-      accumulator -= interval;
-      takeStep();
-      if (world().step >= 200) {
-        playing = false;
-        renderStatus();
-        $("run-note").textContent =
-          "200ステップに到達して一時停止。条件や命令列を確認してください。1ステップ操作は続けられます。";
-      }
+    if (accumulator >= 0.65 / Number(speed.value)) {
+      accumulator -= 0.65 / Number(speed.value); takeStep();
+      if (world().step >= 200) { playing = false; renderStatus(); runNote.setText("200ステップに到達して一時停止。1ステップ操作は続けられます。"); }
     }
   });
-  context.onDispose(() => shutdown.abort());
 });
-try {
-  await game.run("puzzle");
-  $<HTMLButtonElement>("restart").disabled = false;
-  renderEditor();
-  renderStatus();
-} catch (error) {
-  $("run-note").textContent = `起動できませんでした：${String(error)}`;
-}
-window.addEventListener(
-  "pagehide",
-  (event) => {
-    if (!event.persisted) game.dispose();
-  },
-  { signal: shutdown.signal },
-);
+await game.run("puzzle");
 if (import.meta.hot) import.meta.hot.dispose(() => game.dispose());
+
+/** Inspectable public Canvas nodes for embedding and behavioral regression checks. */
+export const screen = {
+  root, region, mapPanel, editor, logs, help, status, runNote, outcome, gate, positions,
+  draftBadge, error, target, commands, snapshot, logItems, logScroll, logRange,
+  play, step, restart, speed, kind, direction, moveCount, x, y, waitCount, cx, cy,
+  device, condition, conditionPosition, add, filter, previous, next, tabs, peopleButtons,
+  get ui() { return ui; },
+};
