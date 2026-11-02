@@ -1,0 +1,86 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> run-to-exit@0.1.0 test:e2e
+> playwright test --config=/tmp/rte-v012-pages.config.ts --workers=1 --output=/tmp/rte-v012-pages-results
+
+
+Running 27 tests using 1 worker
+
+(node:38) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   1 [desktop] › tests/e2e/game.spec.ts:46:1 › builds a plan in the real editor and clears the original stage (21.8s)
+(node:115) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 [desktop] › tests/e2e/game.spec.ts:74:1 › pauses, resumes, single-steps, and isolates edits from an active snapshot (27.1s)
+  ✓   3 [desktop] › tests/e2e/game.spec.ts:110:1 › reports a collision without partially moving either person and highlights its log (34.8s)
+  ✓   4 [desktop] › tests/e2e/game.spec.ts:134:1 › reorders/deletes commands, validates values, and supports all waiting controls (20.1s)
+  ✓   5 [desktop] › tests/e2e/game.spec.ts:165:1 › Canvas pointer coordinates choose a cell and Canvas buttons choose a person (17.5s)
+  ✓   6 [desktop] › tests/e2e/game.spec.ts:186:1 › loads and reloads the production subpath with healthy local assets (14.9s)
+  ✓   7 [desktop] › tests/e2e/game.spec.ts:203:1 › keyboard map targeting stays isolated from form input and editor focus survives edits (19.1s)
+  ✓   8 [desktop] › tests/e2e/game.spec.ts:241:1 › ships registry SDK inventory, license notices, and supports 320px command scrolling (34.3s)
+  ✓   9 [desktop] › tests/e2e/game.spec.ts:260:1 › bound map viewport follows host resize and HUD taps keep world coordinates (16.6s)
+(node:288) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  10 [compact] › tests/e2e/game.spec.ts:46:1 › builds a plan in the real editor and clears the original stage (21.7s)
+  ✓  11 [compact] › tests/e2e/game.spec.ts:74:1 › pauses, resumes, single-steps, and isolates edits from an active snapshot (16.4s)
+  ✓  12 [compact] › tests/e2e/game.spec.ts:110:1 › reports a collision without partially moving either person and highlights its log (14.2s)
+  ✓  13 [compact] › tests/e2e/game.spec.ts:134:1 › reorders/deletes commands, validates values, and supports all waiting controls (17.3s)
+  ✓  14 [compact] › tests/e2e/game.spec.ts:165:1 › Canvas pointer coordinates choose a cell and Canvas buttons choose a person (13.8s)
+  ✓  15 [compact] › tests/e2e/game.spec.ts:186:1 › loads and reloads the production subpath with healthy local assets (13.5s)
+  ✓  16 [compact] › tests/e2e/game.spec.ts:203:1 › keyboard map targeting stays isolated from form input and editor focus survives edits (18.3s)
+  ✓  17 [compact] › tests/e2e/game.spec.ts:241:1 › ships registry SDK inventory, license notices, and supports 320px command scrolling (30.1s)
+  ✓  18 [compact] › tests/e2e/game.spec.ts:260:1 › bound map viewport follows host resize and HUD taps keep world coordinates (16.3s)
+(node:474) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  19 [narrow] › tests/e2e/game.spec.ts:46:1 › builds a plan in the real editor and clears the original stage (20.2s)
+  ✓  20 [narrow] › tests/e2e/game.spec.ts:74:1 › pauses, resumes, single-steps, and isolates edits from an active snapshot (18.6s)
+  ✓  21 [narrow] › tests/e2e/game.spec.ts:110:1 › reports a collision without partially moving either person and highlights its log (15.4s)
+  ✓  22 [narrow] › tests/e2e/game.spec.ts:134:1 › reorders/deletes commands, validates values, and supports all waiting controls (15.5s)
+  ✓  23 [narrow] › tests/e2e/game.spec.ts:165:1 › Canvas pointer coordinates choose a cell and Canvas buttons choose a person (13.6s)
+  ✓  24 [narrow] › tests/e2e/game.spec.ts:186:1 › loads and reloads the production subpath with healthy local assets (13.9s)
+  ✓  25 [narrow] › tests/e2e/game.spec.ts:203:1 › keyboard map targeting stays isolated from form input and editor focus survives edits (15.5s)
+  ✓  26 [narrow] › tests/e2e/game.spec.ts:241:1 › ships registry SDK inventory, license notices, and supports 320px command scrolling (36.4s)
+  ✓  27 [narrow] › tests/e2e/game.spec.ts:260:1 › bound map viewport follows host resize and HUD taps keep world coordinates (18.3s)
+
+
+  1) [desktop] › tests/e2e/game.spec.ts:46:1 › builds a plan in the real editor and clears the original stage 
+
+    Error: expect(locator).toBeEnabled() failed
+
+    Locator: locator('#play')
+    Expected: enabled
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeEnabled" locator('#play') with timeout 5000ms
+      - waiting for locator('#play')
+
+
+      2 | async function open(page: Page) {
+      3 |   await page.goto("./");
+    > 4 |   await expect(page.locator("#play")).toBeEnabled();
+        |                                       ^
+      5 | }
+      6 | async function boardProjection(page: Page, point = {x: 56 + 2.5 * 48, y: 32 + 6.5 * 48}) {
+      7 |   await page.locator("#board .simpludify").scrollIntoViewIfNeeded();
+        at open (/workspace/scratch/43df4592ada2/Run-To-Exit/tests/e2e/game.spec.ts:4:39)
+        at /workspace/scratch/43df4592ada2/Run-To-Exit/tests/e2e/game.spec.ts:51:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/rte-v012-pages-results/game-builds-a-plan-in-the--f3c0c-d-clears-the-original-stage-desktop/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/rte-v012-pages-results/game-builds-a-plan-in-the--f3c0c-d-clears-the-original-stage-desktop/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/rte-v012-pages-results/game-builds-a-plan-in-the--f3c0c-d-clears-the-original-stage-desktop/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../tmp/rte-v012-pages-results/game-builds-a-plan-in-the--f3c0c-d-clears-the-original-stage-desktop/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [desktop] › tests/e2e/game.spec.ts:46:1 › builds a plan in the real editor and clears the original stage 
+  26 passed (9.0m)
