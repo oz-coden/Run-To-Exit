@@ -71,7 +71,7 @@ npm run dev
 
 ### Simpludifyの固定と更新
 
-公開npm SDKの **`@simpludify/core@0.1.3` / `@simpludify/web@0.1.3`** を使用します。WebもCoreの0.1.3に依存し、`npm ci`で同一のCoreへ解決されます。ESMの公開exportからだけimportし、エンジンのソースコピーやビルド時のGitHub取得は行いません。Webの公開エントリから必要なCSSも読み込まれます。
+公開npm SDKの **`@simpludify/core@0.1.7` / `@simpludify/web@0.1.7`** を使用します。Webも同じバージョンのCoreに依存し、`npm ci`で同一のCoreへ解決されます。ESMの公開exportからだけimportし、エンジンのソースコピーやビルド時のGitHub取得は行いません。Webの公開エントリから必要なCSSも読み込まれます。
 
 `package.json`はSDKの版を完全固定し、`package-lock.json`は取得先とintegrityを固定します。更新時は両パッケージを同時に指定し、API差分と [SDK利用レビュー](docs/engine-review.md) を確認してください。
 
@@ -105,7 +105,7 @@ GitHub Actionsは型検査・単体テスト・本番ビルドと、デスクト
 
 ## Canvas UIとアクセシビリティ
 
-画面の配置・操作部品・説明文はSimpludify Canvas UIで構成します。SDK 0.1.3のセマンティックミラーを使い、見出し、状態・対象座標の通知、入力エラーをブラウザのアクセシビリティツリーへ伝えます。通常のE2Eで説明文と意味情報を必須検証します。実機の日本語IME・ソフトキーボード・スクリーンリーダーは未検証です。[移行記録](docs/work-reports/2026-11-02-canvas-ui.md)と[0.1.3適用記録](docs/work-reports/2026-11-03-v0.1.3-adoption.md)を参照してください。
+画面の配置・操作部品・説明文はSimpludify Canvas UIで構成します。SDKのセマンティックミラーを使い、見出し、状態・対象座標の通知、入力エラーをブラウザのアクセシビリティツリーへ伝えます。通常のE2Eで説明文と意味情報を必須検証します。実機の日本語IME・ソフトキーボード・スクリーンリーダーは未検証です。[Canvas UI移行記録](docs/work-reports/2026-11-02-canvas-ui.md)と[初回SDK適用記録](docs/work-reports/2026-11-03-v0.1.3-adoption.md)を参照してください。
 
 ## 実装範囲と制約
 

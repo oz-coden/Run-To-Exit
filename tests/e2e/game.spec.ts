@@ -435,7 +435,7 @@ test("production subpath, registry inventory and 320/390 layouts stay healthy", 
 		expect(
 			inventory.find((p: { name: string }) => p.name === name),
 		).toMatchObject({
-			version: process.env.E2E_SDK_VERSION ?? "0.1.3",
+			version: process.env.E2E_SDK_VERSION ?? "0.1.7",
 			license: "MIT",
 		});
 	expect(await (await request.get("THIRD-PARTY-NOTICES.txt")).text()).toContain(
