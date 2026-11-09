@@ -443,15 +443,32 @@ test("production subpath, registry inventory and 320/390 layouts stay healthy", 
 	);
 	for (const width of [900, 390, 320]) {
 		await page.setViewportSize({ width, height: 844 });
+		// Let the browser deliver Game's ResizeObserver before advancing the paused
+		// clock. The next scene update then selects the layout for the new size.
+		await page.evaluate(
+			() =>
+				new Promise<void>((resolve) => {
+					const observer = new ResizeObserver(() => {
+						observer.disconnect();
+						resolve();
+					});
+					observer.observe(window.puzzle.game.element);
+				}),
+		);
 		await tab(page, "マップ");
-		await expect
-			.poll(() => page.evaluate(() => window.puzzle.game.viewport.width))
-			.toBeGreaterThan(150);
-		expect(
-			await page.evaluate(
-				() => document.documentElement.scrollWidth <= innerWidth,
-			),
-		).toBe(true);
+		const layout = await page.evaluate(() => {
+			const { game, screen } = window.puzzle;
+			return {
+				mapWidth: game.viewport.width,
+				editorVisible: screen.editor.visible,
+				noOverflow: document.documentElement.scrollWidth <= innerWidth,
+			};
+		});
+		expect(layout.mapWidth, `map width at ${width}px`).toBeGreaterThan(150);
+		expect(layout.editorVisible, `editor visibility at ${width}px`).toBe(
+			width === 900,
+		);
+		expect(layout.noOverflow, `horizontal overflow at ${width}px`).toBe(true);
 		await tab(page, "遊び方");
 		await activate(page, "攻略例をセット");
 	}
