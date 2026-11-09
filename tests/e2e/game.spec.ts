@@ -392,7 +392,7 @@ test("scene recreation disposes old UI and releases native input and projection"
 	await add(page, "方向へ移動");
 	const result = await page.evaluate(async () => {
 		const { game, screen: old } = window.puzzle;
-		await game.goTo("puzzle");
+		await game.changeScene("puzzle");
 		return {
 			oldDisposed: old.ui.disposed,
 			rootDisposed: old.root.disposed,

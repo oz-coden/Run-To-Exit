@@ -22,7 +22,7 @@ CoreはDOM・Pixiを含まない。WebはGameの非同期起動、シーン、�
 
 ## Simpludifyとゲーム時間
 
-Gameの `scene('puzzle', setup)` でマップ、Actor、Canvas UI、購読、描画更新を所有する。`await game.run('puzzle')` の成功後に再生操作を有効化する。Worldの初期化と再実行はモデルを交換するため、シーン全体を作り直す必要がない。非同期の別画面への移動には公開 `game.goTo` があるが、1ステージの初期版では利用していない。
+Gameの `scene('puzzle', setup)` でマップ、Actor、Canvas UI、購読、描画更新を所有する。`await game.run('puzzle')` の成功後に再生操作を有効化する。Worldの初期化と再実行はモデルを交換するため、シーン全体を作り直す必要がない。候補SDKを使うE2Eは、公開APIの `game.changeScene("puzzle")` でSceneを作り直し、古いUIと入力が解放されることを確認する。このE2Eには同APIを持つ候補SDKのtarballが必要。
 
 SceneのonUpdateが再生ペースを受け持つ。秒数の蓄積から整数世界ステップを順に要求し、その前後を `Scene.presentationTweens` の公開 `Tween.bind` と `Easing.InOutCubic` で補間する。TweenはBoardの表示進捗だけを書き換え、Worldには触れない。速い手動操作や再実行で補間を置き換える際は旧Tweenをfinishして終端を揃える。Scene破棄時はTweenも解除される。世界更新に実フレーム時間は入らない。ゲームの一時停止はこの要求を止め、描画や命令編集を継続する。エンジン全体をpauseする必要はない。
 
