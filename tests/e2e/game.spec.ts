@@ -493,3 +493,31 @@ test("label semantics expose stage help, errors and status", async ({
 	).toHaveCount(1);
 	await expect(page.getByRole("alert")).toContainText("整数を入力してください");
 });
+
+test("runs the candidate Asset and diagnostic APIs in the packaged game", async ({ page }) => {
+	await open(page);
+	const result = await page.evaluate(async () => {
+		const { game } = window.puzzle;
+		const scope = game.assets.scope(game.engine.scene);
+		const asset = scope.load({
+			kind: "json",
+			url: "data:application/json,%7B%22stage%22%3A1%7D",
+		});
+		await asset.ready;
+		const diagnostics: string[] = [];
+		const off = game.logger.subscribe((entry) => diagnostics.push(entry.message), scope);
+		game.logger.info("consumer checkpoint");
+		game.logger.info("consumer checkpoint");
+		const value = asset.value;
+		await game.changeScene("puzzle");
+		game.logger.info("after scope disposal");
+		off();
+		return { value, diagnostics, scopeDisposed: scope.disposed, released: asset.status };
+	});
+	expect(result).toEqual({
+		value: { stage: 1 },
+		diagnostics: ["consumer checkpoint", "consumer checkpoint"],
+		scopeDisposed: true,
+		released: "released",
+	});
+});

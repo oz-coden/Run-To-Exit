@@ -32,22 +32,18 @@ import {
 import { collisionExample, solution, stage } from "./stage";
 import "./style.css";
 
-function errorText(error: unknown): string {
-	return error instanceof AggregateError
-		? error.errors.map(errorText).join("; ")
-		: String(error);
-}
 export const game = new Game({
 	parent: document.querySelector<HTMLElement>("#app")!,
 	resolution: { width: 640, height: 448 },
 	maxDelta: 0.25,
 	tokens: { background: "#101f2a" },
-	onError: (e) =>
-		screen?.runNote.setText(
-			`ゲームの起動または描画に失敗しました：${errorText(e)}`,
-		),
+	logging: { console: false },
 });
 export let screen: ReturnType<typeof createScreen>;
+game.logger.subscribe((entry) => {
+	if (entry.level === "error" && entry.source?.startsWith("engine."))
+		screen?.runNote.setText("ゲームの処理に失敗しました。");
+});
 game.scene("puzzle", (context) => {
 	screen = createScreen(context);
 });
